@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POS (Caja)</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+
+  <link rel="stylesheet" href="/Estilos/POS.css" />
+</head>
+
+<body>
+  <div class="pos-shell">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <div class="d-flex align-items-center justify-content-between gap-2">
+        <div class="d-flex align-items-center gap-3">
+          <a href="index.html" class="btn btn-soft btn-sm">← Dashboard</a>
+          <div>
+            <div class="fw-bold">POS (Caja)</div>
+            <div class="small muted" id="bizLabel">—</div>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <span class="chip" id="todayTotalChip">$0.00 hoy</span>
+          <button class="btn btn-soft btn-sm" id="btnLogout">Cerrar sesión</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <main class="content">
+
+      <!-- LEFT: PRODUCTS -->
+      <section class="panel">
+        <div class="cardx p-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="fw-semibold">Productos</div>
+            <button class="btn btn-primary btn-sm" id="btnOpenProductModal">+ Nuevo</button>
+          </div>
+
+          <input class="form-control mb-2" id="productSearch" placeholder="Buscar producto..." />
+
+          <div id="productList" class="list"></div>
+        </div>
+
+        <div class="cardx p-3 mt-3">
+          <div class="fw-semibold mb-2">Ventas recientes</div>
+          <div id="salesList" class="list small"></div>
+        </div>
+      </section>
+
+      <!-- RIGHT: CART / CHECKOUT -->
+      <section class="panel">
+        <div class="cardx p-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="fw-semibold">Carrito</div>
+            <button class="btn btn-soft btn-sm" id="btnClearCart">Vaciar</button>
+          </div>
+
+          <input class="form-control mb-2" id="posSearch" placeholder="Buscar y agregar al carrito..." />
+
+          <div id="cartList" class="list mb-2"></div>
+
+          <div class="summary">
+            <div class="d-flex justify-content-between">
+              <span class="muted">Subtotal</span>
+              <span id="subtotalLabel">$0.00</span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span class="muted">Descuento</span>
+              <div class="d-flex align-items-center gap-2">
+                <input class="form-control form-control-sm w-50" id="discountInput" type="number" min="0" step="0.01" value="0" />
+                <span class="muted">$</span>
+              </div>
+            </div>
+            <hr style="border-color: rgba(255,255,255,.10);" />
+            <div class="d-flex justify-content-between fs-5 fw-bold">
+              <span>Total</span>
+              <span id="totalLabel">$0.00</span>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label small muted">Método de pago</label>
+            <select id="paymentMethod" class="form-select">
+              <option value="Efectivo">Efectivo</option>
+              <option value="Tarjeta">Tarjeta</option>
+              <option value="Transferencia">Transferencia</option>
+              <option value="Mixto">Mixto</option>
+            </select>
+          </div>
+
+          <div class="mt-3 d-grid gap-2">
+            <button class="btn btn-success" id="btnCheckout">Cobrar</button>
+            <div id="posMsg" class="alert alert-danger py-2 d-none"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- PRODUCT MODAL -->
+  <div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content modal-dark">
+        <div class="modal-header">
+          <h5 class="modal-title" id="productModalTitle">Nuevo producto</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="prodId" />
+
+          <div class="mb-2">
+            <label class="form-label small muted">Nombre</label>
+            <input class="form-control" id="prodName" placeholder="Ej: Pizza grande" />
+          </div>
+
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small muted">Precio</label>
+              <input class="form-control" id="prodPrice" type="number" min="0" step="0.01" placeholder="Ej: 199" />
+            </div>
+            <div class="col-6">
+              <label class="form-label small muted">Stock</label>
+              <input class="form-control" id="prodStock" type="number" min="0" step="1" placeholder="Ej: 20" />
+            </div>
+          </div>
+
+          <div class="mt-2">
+            <label class="form-label small muted">SKU (opcional)</label>
+            <input class="form-control" id="prodSku" placeholder="Ej: PIZ-GRA-001" />
+          </div>
+
+          <div class="mt-3" id="prodError" class="alert alert-danger py-2 d-none"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-soft" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary" id="btnSaveProduct">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+    crossorigin="anonymous"></script>
+
+  <script src="/JavaScript/POS.js"></script>
+</body>
+</html>

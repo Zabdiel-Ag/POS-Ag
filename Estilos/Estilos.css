@@ -1,0 +1,60 @@
+body {
+  background: #0b0f14;
+  color: #e9eef5;
+}
+
+.shell {
+  max-width: 520px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 18px;
+}
+
+.muted {
+  color: rgba(233, 238, 245, 0.72);
+}
+
+.form-control {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e9eef5;
+}
+
+.form-control::placeholder {
+  color: rgba(233, 238, 245, 0.55);
+}
+
+.form-control:focus {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(13, 110, 253, 0.60);
+  box-shadow: 0 0 0 .2rem rgba(13, 110, 253, 0.15);
+  color: #e9eef5;
+}
+
+.btn-soft {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.btn-soft:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.form-select {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e9eef5;
+}
+.form-select:focus {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(13,110,253,.6);
+  box-shadow: 0 0 0 .2rem rgba(13,110,253,.15);
+  color: #e9eef5;
+}

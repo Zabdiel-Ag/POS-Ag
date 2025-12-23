@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+
+  <link rel="stylesheet" href="Estilos/dashboard.css" />
+</head>
+
+<body>
+  <div class="dash">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-title">Mi POS</div>
+        <div class="brand-sub">Dashboard</div>
+      </div>
+
+      <nav class="navlist">
+        <button class="nav-item active" data-screen="home">
+          <span class="dot"></span> Inicio
+        </button>
+        <button class="nav-item" data-screen="search">
+          <span class="dot"></span> Buscar
+        </button>
+        <button class="nav-item" data-screen="explore">
+          <span class="dot"></span> Explorar
+        </button>
+        <button class="nav-item" data-screen="reels">
+          <span class="dot"></span> Contenido
+        </button>
+        <button class="nav-item" data-screen="messages">
+          <span class="dot"></span> Mensajes
+        </button>
+        <button class="nav-item" data-screen="notifications">
+          <span class="dot"></span> Notificaciones
+        </button>
+        <button class="nav-item" data-screen="create">
+          <span class="dot"></span> Crear
+        </button>
+        <button class="nav-item pos" data-screen="pos">
+          <span class="dot"></span> POS (Caja)
+          <a href="POS.html"></a>
+        </button>
+        <button class="nav-item" data-screen="profile">
+          <span class="dot"></span> Perfil
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button id="btnLogoutDash" class="btn btn-soft w-100">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <!-- Top mini header (móvil) -->
+      <div class="mobile-top">
+        <div class="mobile-top-left">
+          <div class="brand-title">Mi POS</div>
+          <div class="brand-sub" id="bizMiniLabel">—</div>
+        </div>
+        <button id="btnLogoutDashMobile" class="btn btn-soft btn-sm">Salir</button>
+      </div>
+
+      <!-- CENTER FEED -->
+      <section class="center">
+
+        <!-- Stories / accesos rápidos -->
+        <div class="cardx p-3 mb-3">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="fw-semibold">Accesos rápidos</div>
+            <span class="chip">Modo dashboard</span>
+          </div>
+
+          <div class="stories">
+            <button class="story">
+              <div class="story-circle">+</div>
+              <div class="story-text">Promo</div>
+            </button>
+            <button class="story">
+              <div class="story-circle">📦</div>
+              <div class="story-text">Inventario</div>
+            </button>
+            <button class="story">
+              <div class="story-circle">💳</div>
+              <div class="story-text">Cobrar</div>
+            </button>
+            <button class="story">
+              <div class="story-circle">📈</div>
+              <div class="story-text">Reportes</div>
+            </button>
+            <button class="story">
+              <div class="story-circle">👥</div>
+              <div class="story-text">Equipo</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Feed placeholder -->
+        <div id="feed" class="d-grid gap-3">
+          <article class="post cardx p-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <div class="d-flex align-items-center gap-2">
+                <div class="avatar" id="bizAvatar"></div>
+                <div>
+                  <div class="fw-semibold" id="bizNameFeed">Tu empresa</div>
+                  <div class="small muted" id="bizHandleFeed">@empresa</div>
+                </div>
+              </div>
+              <button class="btn btn-soft btn-sm">•••</button>
+            </div>
+
+            <div class="post-media mt-3">
+              <div class="post-media-inner">
+                <div class="muted">Aquí irá tu feed de productos / ventas / promociones.</div>
+                <div class="small muted mt-1">Siguiente paso: crear “posts” (productos) desde tu panel.</div>
+              </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-3">
+              <button class="btn btn-soft">❤️</button>
+              <button class="btn btn-soft">💬</button>
+              <button class="btn btn-soft">↗</button>
+              <div class="ms-auto price" id="bizCategoryFeed">Categoría</div>
+            </div>
+          </article>
+
+          <article class="post cardx p-3">
+            <div class="fw-semibold mb-1">Bienvenido</div>
+            <div class="muted">Tu sesión y empresa se cargan desde <b>localStorage</b>. Esto es tu layout base tipo Instagram.</div>
+          </article>
+        </div>
+
+      </section>
+
+      <!-- RIGHT PANEL -->
+      <aside class="right">
+        <div class="cardx p-3 mb-3">
+          <div class="d-flex align-items-center gap-3">
+            <img id="bizLogoImg" class="biz-logo d-none" alt="logo">
+            <div class="biz-logo-fallback" id="bizLogoFallback">🏪</div>
+
+            <div class="flex-grow-1">
+              <div class="fw-semibold" id="bizNameRight">—</div>
+              <div class="small muted" id="bizCategoryRight">—</div>
+              <div class="small muted" id="bizHandleRight">—</div>
+            </div>
+
+            <button class="btn btn-soft btn-sm" id="btnEditBiz">Cambiar</button>
+          </div>
+        </div>
+
+        <div class="cardx p-3">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="fw-semibold">Equipo conectado</div>
+            <button class="btn btn-link btn-sm link-light" style="text-decoration:none;">Ver todo</button>
+          </div>
+
+          <div class="muted small mb-2">
+            Aquí mostraremos usuarios conectados a tu empresa (empleados / cajeros). Por ahora es demo visual.
+          </div>
+
+          <div class="suggestions" id="teamList">
+            <!-- demo items -->
+          </div>
+
+          <hr class="my-3" style="border-color: rgba(255,255,255,.10);" />
+
+          <div class="small muted">
+            Próximo paso: invitar usuarios por correo y asignar rol (admin/cajero/inventario).
+          </div>
+        </div>
+      </aside>
+
+    </main>
+  </div>
+
+  <script src="JavaScript/dashboard.js"></script>
+</body>
+</html>
