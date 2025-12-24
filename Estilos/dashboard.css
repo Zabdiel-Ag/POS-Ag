@@ -420,3 +420,135 @@ a.nav-item:hover{
 }
 
 
+.post-preview{
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+  overflow: hidden;
+}
+.post-preview img,
+.post-preview video{
+  width: 100%;
+  height: 260px;
+  object-fit: cover;
+  display:block;
+}
+
+
+/* ================================
+   MODAL CREATE POST (PREMIUM)
+=================================*/
+
+.modal-dark{
+  background: linear-gradient(
+    180deg,
+    rgba(15,20,30,.98),
+    rgba(11,15,20,.98)
+  );
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 22px;
+  box-shadow:
+    0 20px 60px rgba(0,0,0,.55),
+    inset 0 0 0 1px rgba(255,255,255,.03);
+}
+
+/* Header */
+.modal-dark .modal-header{
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.modal-dark .modal-title{
+  font-weight: 800;
+  letter-spacing: .3px;
+}
+
+/* Body */
+.modal-dark .modal-body{
+  padding: 18px;
+}
+
+/* Footer */
+.modal-dark .modal-footer{
+  padding: 14px 18px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+/* Inputs */
+.modal-dark .form-control,
+.modal-dark .form-select{
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.14);
+  color: var(--text);
+  border-radius: 14px;
+}
+.modal-dark .form-control::placeholder{
+  color: rgba(233,238,245,.55);
+}
+.modal-dark .form-control:focus,
+.modal-dark .form-select:focus{
+  background: rgba(255,255,255,.08);
+  border-color: rgba(13,110,253,.55);
+  box-shadow: 0 0 0 .2rem rgba(13,110,253,.18);
+}
+
+/* Upload */
+.modal-dark input[type="file"]{
+  padding: 10px;
+  cursor: pointer;
+}
+
+/* Preview */
+.post-preview{
+  border-radius: 16px;
+  border: 1px dashed rgba(255,255,255,.18);
+  background: rgba(255,255,255,.04);
+  padding: 12px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+.post-preview img,
+.post-preview video{
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+/* Buttons */
+.modal-dark .btn-primary{
+  border-radius: 14px;
+  font-weight: 700;
+  padding: 8px 18px;
+}
+.modal-dark .btn-soft{
+  border-radius: 14px;
+}
+
+/* Close button */
+.modal-dark .btn-close{
+  filter: invert(1);
+  opacity: .7;
+}
+.modal-dark .btn-close:hover{
+  opacity: 1;
+}
+
+/* Error */
+.modal-dark .alert{
+  border-radius: 14px;
+  background: rgba(220,53,69,.15);
+  border: 1px solid rgba(220,53,69,.35);
+  color: #ffb3b3;
+}
+
+/* Mobile polish */
+@media (max-width: 576px){
+  .modal-dialog{
+    margin: 12px;
+  }
+  .post-preview img,
+  .post-preview video{
+    max-height: 240px;
+  }
+}
