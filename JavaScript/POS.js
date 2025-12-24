@@ -2,8 +2,8 @@
 const USERS_KEY = "pos_users";
 const SESSION_KEY = "pos_session";
 const BUSINESSES_KEY = "pos_businesses";
-const PRODUCTS_KEY = "pos_products";
-const SALES_KEY = "pos_sales";
+const PRODUCTS_KEY = "pos_products_v1";
+const SALES_KEY = "pos_sales_v1";
 
 // ===== Helpers storage =====
 function jget(key, fallback) {
@@ -25,20 +25,20 @@ function getBusinessByOwner(userId) {
 
 function requireAuth() {
   const session = getSession();
-  if (!session?.userId) { window.location.href = "index.html"; return null; }
+  // ✅ IMPORTANTE: Index.html con mayúscula (tu convención)
+  if (!session?.userId) { window.location.href = "Index.html"; return null; }
 
   const user = getUsers().find(u => u.id === session.userId);
-  if (!user) { clearSession(); window.location.href = "index.html"; return null; }
+  if (!user) { clearSession(); window.location.href = "Index.html"; return null; }
 
   const biz = getBusinessByOwner(session.userId);
-  if (!biz) { window.location.href = "index.html"; return null; }
+  if (!biz) { window.location.href = "Index.html"; return null; }
 
   return { user, biz };
 }
 
 // ===== Data models =====
-// product: {id,businessId,name,price,stock,sku,createdAt,updatedAt}
-// sale: {id,businessId,createdAt,items:[{productId,name,price,qty}], subtotal, discount, total, method}
+
 
 function getAllProducts() { return jget(PRODUCTS_KEY, []); }
 function saveAllProducts(all) { jset(PRODUCTS_KEY, all); }
@@ -68,7 +68,6 @@ function todayISODate() {
 }
 
 function isToday(isoString) {
-  // isoString = createdAt
   return String(isoString || "").slice(0,10) === todayISODate();
 }
 
@@ -220,6 +219,7 @@ function renderSales() {
 
   if (recent.length === 0) {
     salesList.innerHTML = `<div class="muted">Aún no hay ventas.</div>`;
+    renderTodayTotal();
     return;
   }
 
@@ -231,7 +231,7 @@ function renderSales() {
       <div class="item">
         <div>
           <div class="item-title">${money(s.total)} <span class="muted">(${escapeHtml(s.method)})</span></div>
-          <div class="item-sub">${when.toLocaleDateString("es-MX")} ${hh}:${mm} • ${s.items.reduce((a,x)=>a+x.qty,0)} artículos</div>
+          <div class="item-sub">${when.toLocaleDateString("es-MX")} ${hh}:${mm} • ${s.items.reduce((a,x)=>a+Number(x.qty||0),0)} artículos</div>
         </div>
         <span class="chip">${isToday(s.createdAt) ? "Hoy" : "—"}</span>
       </div>
@@ -242,12 +242,25 @@ function renderSales() {
 }
 
 function renderTodayTotal() {
+  const el = document.getElementById("todayTotalChip");
+  if (!el) return;
+
+  const now = new Date();
+
   const totalToday = sales
-    .filter(s => isToday(s.createdAt))
+    .filter(s => {
+      const d = new Date(s.createdAt);
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+      );
+    })
     .reduce((acc, s) => acc + Number(s.total || 0), 0);
 
-  if (todayTotalChip) todayTotalChip.textContent = `${money(totalToday)} hoy`;
+  el.textContent = `${money(totalToday)} hoy`;
 }
+
 
 function updateTotals() {
   const subtotal = cart.reduce((acc, it) => acc + (Number(it.price) * Number(it.qty)), 0);
@@ -344,7 +357,6 @@ function deleteProduct(id) {
   const ok = confirm(`Eliminar "${p.name}"?`);
   if (!ok) return;
 
-  // quitarlo del carrito también
   cart = cart.filter(x => x.productId !== id);
 
   const all = getAllProducts().filter(x => !(x.id === id && x.businessId === ctx.biz.id));
@@ -374,11 +386,9 @@ function addToCart(productId) {
     return;
   }
 
-  if (!item) {
-    cart.push({ productId: p.id, name: p.name, price: p.price, qty: 1 });
-  } else {
-    item.qty += 1;
-  }
+  if (!item) cart.push({ productId: p.id, name: p.name, price: p.price, qty: 1 });
+  else item.qty += 1;
+
   renderCart();
 }
 
@@ -405,9 +415,8 @@ function decCart(productId) {
   clearPosMsg();
 
   item.qty -= 1;
-  if (item.qty <= 0) {
-    cart = cart.filter(x => x.productId !== productId);
-  }
+  if (item.qty <= 0) cart = cart.filter(x => x.productId !== productId);
+
   renderCart();
 }
 
@@ -432,7 +441,6 @@ function checkout() {
     return;
   }
 
-  // recalcular
   const subtotal = cart.reduce((acc, it) => acc + (Number(it.price) * Number(it.qty)), 0);
   const discount = Math.max(0, Number(discountInput?.value || 0));
   const total = Math.max(0, subtotal - discount);
@@ -460,12 +468,17 @@ function checkout() {
   }
   saveAllProducts(allProducts);
 
-  // guardar venta
+  // ✅ VENTA (CORREGIDA) — compatible con el resto del archivo
   const sale = {
     id: crypto.randomUUID(),
     businessId: ctx.biz.id,
     createdAt: new Date().toISOString(),
-    items: cart.map(x => ({ ...x })), // copia
+    items: cart.map(item => ({
+      productId: item.productId, // ✅ era item.id (mal)
+      name: item.name,
+      price: item.price,
+      qty: item.qty
+    })),
     subtotal,
     discount,
     total,
@@ -493,26 +506,22 @@ function checkout() {
 
 // ===== Events wiring =====
 function wireEvents() {
-  // logout
   btnLogout?.addEventListener("click", () => {
     clearSession();
     window.location.href = "Index.html";
   });
 
-  // products
   btnOpenProductModal?.addEventListener("click", openNewProduct);
   btnSaveProduct?.addEventListener("click", saveProductFromModal);
 
   productSearch?.addEventListener("input", () => renderProducts(productSearch.value));
 
-  // clicks list products (delegation)
   productList?.addEventListener("click", (e) => {
     const btn = e.target.closest("button");
     if (!btn) return;
 
     const id = btn.getAttribute("data-id");
     const act = btn.getAttribute("data-act");
-
     if (!id || !act) return;
 
     if (act === "add") addToCart(id);
@@ -520,7 +529,6 @@ function wireEvents() {
     if (act === "del") deleteProduct(id);
   });
 
-  // quick add from search (enter adds first match)
   posSearch?.addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
     const q = (posSearch.value || "").trim().toLowerCase();
@@ -537,14 +545,12 @@ function wireEvents() {
     posSearch.value = "";
   });
 
-  // cart controls (delegation)
   cartList?.addEventListener("click", (e) => {
     const btn = e.target.closest("button");
     if (!btn) return;
 
     const id = btn.getAttribute("data-id");
     const act = btn.getAttribute("data-act");
-
     if (!id || !act) return;
 
     if (act === "inc") incCart(id);
@@ -552,10 +558,8 @@ function wireEvents() {
     if (act === "rm") removeFromCart(id);
   });
 
-  // totals
   discountInput?.addEventListener("input", updateTotals);
 
-  // cart buttons
   btnClearCart?.addEventListener("click", clearCart);
   btnCheckout?.addEventListener("click", checkout);
 }
@@ -565,8 +569,6 @@ function wireEvents() {
   ctx = requireAuth();
   if (!ctx) return;
 
-  // NOTA: businessId para productos/ventas es ctx.biz.id (id del negocio)
-  // En tu wizard guardamos newBiz.id, así que esto amarra perfecto.
   renderBiz();
 
   products = getProductsByBiz(ctx.biz.id);

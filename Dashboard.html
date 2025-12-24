@@ -9,53 +9,72 @@
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
 
   <link rel="stylesheet" href="Estilos/dashboard.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
 </head>
 
 <body>
-  <div class="dash">
+ <div class="dash">
 
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-title">Mi POS</div>
-        <div class="brand-sub">Dashboard</div>
-      </div>
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-title">Mi POS</div>
+      <div class="brand-sub">Dashboard</div>
+    </div>
 
-      <nav class="navlist">
-        <button class="nav-item active" data-screen="home">
-          <span class="dot"></span> Inicio
-        </button>
-        <button class="nav-item" data-screen="search">
-          <span class="dot"></span> Buscar
-        </button>
-        <button class="nav-item" data-screen="explore">
-          <span class="dot"></span> Explorar
-        </button>
-        <button class="nav-item" data-screen="reels">
-          <span class="dot"></span> Contenido
-        </button>
-        <button class="nav-item" data-screen="messages">
-          <span class="dot"></span> Mensajes
-        </button>
-        <button class="nav-item" data-screen="notifications">
-          <span class="dot"></span> Notificaciones
-        </button>
-        <button class="nav-item" data-screen="create">
-          <span class="dot"></span> Crear
-        </button>
-        <button class="nav-item pos" data-screen="pos">
-          <span class="dot"></span> POS (Caja)
-          <a href="POS.html"></a>
-        </button>
-        <button class="nav-item" data-screen="profile">
-          <span class="dot"></span> Perfil
-        </button>
-      </nav>
+    <nav class="navlist">
+      <button class="nav-item active" data-screen="home" type="button">
+        <i class="bi bi-house-door"></i>
+        <span>Inicio</span>
+      </button>
 
-      <div class="sidebar-footer">
-        <button id="btnLogoutDash" class="btn btn-soft w-100">Cerrar sesión</button>
-      </div>
-    </aside>
+      <button class="nav-item" data-screen="search" type="button">
+        <i class="bi bi-search"></i>
+        <span>Buscar</span>
+      </button>
+
+      <button class="nav-item" data-screen="explore" type="button">
+        <i class="bi bi-compass"></i>
+        <span>Explorar</span>
+      </button>
+
+      <button class="nav-item" data-screen="reels" type="button">
+        <i class="bi bi-grid-3x3-gap"></i>
+        <span>Contenido</span>
+      </button>
+
+      <button class="nav-item" data-screen="messages" type="button">
+        <i class="bi bi-chat-dots"></i>
+        <span>Mensajes</span>
+      </button>
+
+      <button class="nav-item" data-screen="notifications" type="button">
+        <i class="bi bi-bell"></i>
+        <span>Notificaciones</span>
+      </button>
+
+      <button class="nav-item" data-screen="create" type="button">
+        <i class="bi bi-plus-square"></i>
+        <span>Crear</span>
+      </button>
+
+      <a class="nav-item pos" href="POS.html" data-screen="pos">
+        <i class="bi bi-cash-coin"></i>
+        <span>POS (Caja)</span>
+      </a>
+
+      <button class="nav-item" data-screen="profile" type="button">
+        <i class="bi bi-person-circle"></i>
+        <span>Perfil</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button id="btnLogoutDash" class="btn btn-soft w-100">Cerrar sesión</button>
+    </div>
+  </aside>
+
 
     <!-- MAIN -->
     <main class="main">
@@ -80,34 +99,33 @@
 
       <div class="stories">
 
-      <!-- Acción interna (ej. crear promo / modal después) -->
-      <button class="story" type="button">
-        <div class="story-circle">+</div>
-        <div class="story-text">Promo</div>
-      </button>
+  <button class="story" type="button">
+    <div class="story-circle"><i class="bi bi-megaphone"></i></div>
+    <div class="story-text">Promo</div>
+  </button>
 
-      <!-- Navegación -->
-      <a href="Inventario.html" class="story">
-        <div class="story-circle">📦</div>
-        <div class="story-text">Inventario</div>
-      </a>
+  <a href="Inventario.html" class="story">
+    <div class="story-circle"><i class="bi bi-box-seam"></i></div>
+    <div class="story-text">Inventario</div>
+  </a>
 
-      <a href="POS.html" class="story">
-        <div class="story-circle">💳</div>
-        <div class="story-text">Cobrar</div>
-      </a>
+  <a href="POS.html" class="story">
+    <div class="story-circle"><i class="bi bi-credit-card-2-front"></i></div>
+    <div class="story-text">Cobrar</div>
+  </a>
 
-      <a href="Reportes.html" class="story">
-        <div class="story-circle">📈</div>
-        <div class="story-text">Reportes</div>
-      </a>
+  <a href="Reportes.html" class="story">
+    <div class="story-circle"><i class="bi bi-graph-up-arrow"></i></div>
+    <div class="story-text">Reportes</div>
+  </a>
 
-      <a href="Equipo.html" class="story">
-        <div class="story-circle">👥</div>
-        <div class="story-text">Equipo</div>
-      </a>
+  <a href="Equipo.html" class="story">
+    <div class="story-circle"><i class="bi bi-people"></i></div>
+    <div class="story-text">Equipo</div>
+  </a>
 
-    </div>
+</div>
+
 
 
         <!-- Feed placeholder -->

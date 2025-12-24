@@ -2,7 +2,7 @@
 const USERS_KEY = "pos_users";
 const SESSION_KEY = "pos_session";
 const BUSINESSES_KEY = "pos_businesses";
-const PRODUCTS_KEY = "pos_products_v1"; // <-- NUEVO (inventario por empresa)
+const SALES_KEY = "pos_sales_v1";
 
 // ====== Helpers base ======
 function getUsers() {
