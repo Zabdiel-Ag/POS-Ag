@@ -174,3 +174,16 @@ function setupEditBiz() {
   setupLogout();
   setupEditBiz();
 })();
+
+(function setupBottomNav() {
+  const items = document.querySelectorAll(".bottom-nav .bn-item");
+  if (!items.length) return;
+
+  items.forEach(a => {
+    a.addEventListener("click", () => {
+      items.forEach(x => x.classList.remove("active"));
+      a.classList.add("active");
+    });
+  });
+})();
+

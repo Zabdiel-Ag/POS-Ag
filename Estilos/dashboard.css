@@ -356,3 +356,67 @@ a.nav-item:hover{
 
 /* quita el dot viejo si aún existe */
 .dot{ display:none !important; }
+
+/* ---------- Bottom Nav (mobile) ---------- */
+.bottom-nav{
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: 64px;
+  display: none;               /* solo móvil */
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 10px;
+
+  background: rgba(11,15,20,.70);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid rgba(255,255,255,.10);
+  z-index: 999;
+}
+
+.bn-item{
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: rgba(233,238,245,.88);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: transform .08s ease, background .2s ease, border-color .2s ease;
+}
+
+.bn-item i{
+  font-size: 22px;
+  line-height: 1;
+}
+
+.bn-item:hover{
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.10);
+  transform: translateY(-1px);
+}
+
+.bn-item.active{
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.12);
+  color: #fff;
+}
+
+.bn-item.pos{
+  background: rgba(13,110,253,.18);
+  border-color: rgba(13,110,253,.35);
+}
+
+/* Para que el contenido no quede tapado por la barra inferior */
+@media (max-width: 992px){
+  .bottom-nav{ display: flex; }
+
+  /* Ocultar sidebar y dejar solo el main */
+  .dash{ grid-template-columns: 1fr; }
+  .sidebar{ display:none; }
+
+  /* Deja espacio abajo por el nav */
+  .main{ padding-bottom: 84px !important; }
+}
+
+
