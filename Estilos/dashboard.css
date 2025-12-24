@@ -120,6 +120,9 @@ body{ background:var(--bg); color:var(--text); }
   align-items:center;
   gap: 6px;
   min-width: 86px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
 }
 .story-circle{
   width: 54px;
