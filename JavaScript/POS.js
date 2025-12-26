@@ -25,7 +25,6 @@ function getBusinessByOwner(userId) {
 
 function requireAuth() {
   const session = getSession();
-  // ✅ IMPORTANTE: Index.html con mayúscula (tu convención)
   if (!session?.userId) { window.location.href = "Index.html"; return null; }
 
   const user = getUsers().find(u => u.id === session.userId);
@@ -38,37 +37,28 @@ function requireAuth() {
 }
 
 // ===== Data models =====
-
-
 function getAllProducts() { return jget(PRODUCTS_KEY, []); }
 function saveAllProducts(all) { jset(PRODUCTS_KEY, all); }
-
-function getProductsByBiz(businessId) {
-  return getAllProducts().filter(p => p.businessId === businessId);
-}
+function getProductsByBiz(businessId) { return getAllProducts().filter(p => p.businessId === businessId); }
 
 function getAllSales() { return jget(SALES_KEY, []); }
 function saveAllSales(all) { jset(SALES_KEY, all); }
-
-function getSalesByBiz(businessId) {
-  return getAllSales().filter(s => s.businessId === businessId);
-}
+function getSalesByBiz(businessId) { return getAllSales().filter(s => s.businessId === businessId); }
 
 function money(n) {
   const x = Number(n || 0);
-  return x.toLocaleString("es-MX", { style:"currency", currency:"MXN" });
+  return x.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 }
 
 function todayISODate() {
   const d = new Date();
   const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,"0");
-  const day = String(d.getDate()).padStart(2,"0");
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-
 function isToday(isoString) {
-  return String(isoString || "").slice(0,10) === todayISODate();
+  return String(isoString || "").slice(0, 10) === todayISODate();
 }
 
 // ===== State =====
@@ -94,13 +84,14 @@ const discountInput = document.getElementById("discountInput");
 const paymentMethod = document.getElementById("paymentMethod");
 const posMsg = document.getElementById("posMsg");
 
-const btnLogout = document.getElementById("btnLogout");
 const btnClearCart = document.getElementById("btnClearCart");
 const btnCheckout = document.getElementById("btnCheckout");
 
-// modal
+// ===== Modal producto (solo si existe en el HTML) =====
 const productModalEl = document.getElementById("productModal");
-const productModal = productModalEl ? new bootstrap.Modal(productModalEl) : null;
+const productModal = (productModalEl && window.bootstrap?.Modal)
+  ? bootstrap.Modal.getOrCreateInstance(productModalEl)
+  : null;
 
 const productModalTitle = document.getElementById("productModalTitle");
 const btnOpenProductModal = document.getElementById("btnOpenProductModal");
@@ -125,14 +116,13 @@ function hideError(el) {
   el.classList.add("d-none");
 }
 
-function setPosMsg(msg, isOk=false) {
+function setPosMsg(msg, isOk = false) {
   if (!posMsg) return;
   posMsg.textContent = msg;
   posMsg.classList.remove("d-none");
   posMsg.classList.toggle("alert-danger", !isOk);
   posMsg.classList.toggle("alert-success", isOk);
 }
-
 function clearPosMsg() {
   if (!posMsg) return;
   posMsg.textContent = "";
@@ -141,16 +131,25 @@ function clearPosMsg() {
   posMsg.classList.add("alert-danger");
 }
 
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 // ===== Render =====
 function renderBiz() {
   if (bizLabel) bizLabel.textContent = `${ctx.biz.name}  •  @${ctx.biz.handle}`;
 }
 
-function renderProducts(filterText="") {
+function renderProducts(filterText = "") {
   const q = filterText.trim().toLowerCase();
   const list = products
-    .filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku||"").toLowerCase().includes(q))
-    .sort((a,b) => a.name.localeCompare(b.name));
+    .filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   if (!productList) return;
   productList.innerHTML = "";
@@ -214,7 +213,7 @@ function renderSales() {
   if (!salesList) return;
 
   const recent = [...sales]
-    .sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
     .slice(0, 8);
 
   if (recent.length === 0) {
@@ -225,13 +224,13 @@ function renderSales() {
 
   salesList.innerHTML = recent.map(s => {
     const when = new Date(s.createdAt);
-    const hh = String(when.getHours()).padStart(2,"0");
-    const mm = String(when.getMinutes()).padStart(2,"0");
+    const hh = String(when.getHours()).padStart(2, "0");
+    const mm = String(when.getMinutes()).padStart(2, "0");
     return `
       <div class="item">
         <div>
           <div class="item-title">${money(s.total)} <span class="muted">(${escapeHtml(s.method)})</span></div>
-          <div class="item-sub">${when.toLocaleDateString("es-MX")} ${hh}:${mm} • ${s.items.reduce((a,x)=>a+Number(x.qty||0),0)} artículos</div>
+          <div class="item-sub">${when.toLocaleDateString("es-MX")} ${hh}:${mm} • ${s.items.reduce((a, x) => a + Number(x.qty || 0), 0)} artículos</div>
         </div>
         <span class="chip">${isToday(s.createdAt) ? "Hoy" : "—"}</span>
       </div>
@@ -242,25 +241,20 @@ function renderSales() {
 }
 
 function renderTodayTotal() {
-  const el = document.getElementById("todayTotalChip");
-  if (!el) return;
+  if (!todayTotalChip) return;
 
   const now = new Date();
-
   const totalToday = sales
     .filter(s => {
       const d = new Date(s.createdAt);
-      return (
-        d.getFullYear() === now.getFullYear() &&
-        d.getMonth() === now.getMonth() &&
-        d.getDate() === now.getDate()
-      );
+      return d.getFullYear() === now.getFullYear()
+        && d.getMonth() === now.getMonth()
+        && d.getDate() === now.getDate();
     })
     .reduce((acc, s) => acc + Number(s.total || 0), 0);
 
-  el.textContent = `${money(totalToday)} hoy`;
+  todayTotalChip.textContent = `${money(totalToday)} hoy`;
 }
-
 
 function updateTotals() {
   const subtotal = cart.reduce((acc, it) => acc + (Number(it.price) * Number(it.qty)), 0);
@@ -271,28 +265,24 @@ function updateTotals() {
   if (totalLabel) totalLabel.textContent = money(total);
 }
 
-function escapeHtml(s) {
-  return String(s ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-
 // ===== Actions: Products =====
 function openNewProduct() {
+  // si no tienes modal en el HTML, no hacemos nada
+  if (!productModal) return setPosMsg("Falta el modal de producto en el HTML.", false);
+
   hideError(prodError);
-  prodId.value = "";
-  prodName.value = "";
-  prodPrice.value = "";
-  prodStock.value = "";
-  prodSku.value = "";
+  if (prodId) prodId.value = "";
+  if (prodName) prodName.value = "";
+  if (prodPrice) prodPrice.value = "";
+  if (prodStock) prodStock.value = "";
+  if (prodSku) prodSku.value = "";
   if (productModalTitle) productModalTitle.textContent = "Nuevo producto";
-  productModal?.show();
+  productModal.show();
 }
 
 function openEditProduct(id) {
+  if (!productModal) return setPosMsg("Falta el modal de producto en el HTML.", false);
+
   hideError(prodError);
   const p = products.find(x => x.id === id);
   if (!p) return;
@@ -304,17 +294,17 @@ function openEditProduct(id) {
   prodSku.value = p.sku || "";
 
   if (productModalTitle) productModalTitle.textContent = "Editar producto";
-  productModal?.show();
+  productModal.show();
 }
 
 function saveProductFromModal() {
   hideError(prodError);
 
-  const id = (prodId.value || "").trim();
-  const name = (prodName.value || "").trim();
-  const price = Number(prodPrice.value || 0);
-  const stock = Number(prodStock.value || 0);
-  const sku = (prodSku.value || "").trim();
+  const id = (prodId?.value || "").trim();
+  const name = (prodName?.value || "").trim();
+  const price = Number(prodPrice?.value || 0);
+  const stock = Number(prodStock?.value || 0);
+  const sku = (prodSku?.value || "").trim();
 
   if (name.length < 2) return showError(prodError, "Nombre inválido.");
   if (!(price >= 0)) return showError(prodError, "Precio inválido.");
@@ -323,7 +313,7 @@ function saveProductFromModal() {
   const all = getAllProducts();
 
   if (!id) {
-    const newP = {
+    all.push({
       id: crypto.randomUUID(),
       businessId: ctx.biz.id,
       name,
@@ -332,16 +322,11 @@ function saveProductFromModal() {
       sku,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    };
-    all.push(newP);
+    });
   } else {
     const idx = all.findIndex(x => x.id === id && x.businessId === ctx.biz.id);
     if (idx === -1) return showError(prodError, "No se encontró ese producto.");
-    all[idx] = {
-      ...all[idx],
-      name, price, stock, sku,
-      updatedAt: new Date().toISOString()
-    };
+    all[idx] = { ...all[idx], name, price, stock, sku, updatedAt: new Date().toISOString() };
   }
 
   saveAllProducts(all);
@@ -372,20 +357,14 @@ function addToCart(productId) {
   const p = products.find(x => x.id === productId);
   if (!p) return;
 
-  if (p.stock <= 0) {
-    setPosMsg("No hay stock de ese producto.");
-    return;
-  }
-  clearPosMsg();
+  if (Number(p.stock) <= 0) return setPosMsg("No hay stock de ese producto.");
 
   const item = cart.find(x => x.productId === productId);
   const currentQty = item ? item.qty : 0;
 
-  if (currentQty + 1 > p.stock) {
-    setPosMsg("No puedes agregar más, excede el stock.");
-    return;
-  }
+  if (currentQty + 1 > Number(p.stock)) return setPosMsg("No puedes agregar más, excede el stock.");
 
+  clearPosMsg();
   if (!item) cart.push({ productId: p.id, name: p.name, price: p.price, qty: 1 });
   else item.qty += 1;
 
@@ -399,10 +378,8 @@ function incCart(productId) {
   const p = products.find(x => x.id === productId);
   if (!p) return;
 
-  if (item.qty + 1 > p.stock) {
-    setPosMsg("No puedes agregar más, excede el stock.");
-    return;
-  }
+  if (item.qty + 1 > Number(p.stock)) return setPosMsg("No puedes agregar más, excede el stock.");
+
   clearPosMsg();
   item.qty += 1;
   renderCart();
@@ -413,10 +390,8 @@ function decCart(productId) {
   if (!item) return;
 
   clearPosMsg();
-
   item.qty -= 1;
   if (item.qty <= 0) cart = cart.filter(x => x.productId !== productId);
-
   renderCart();
 }
 
@@ -436,25 +411,19 @@ function clearCart() {
 function checkout() {
   clearPosMsg();
 
-  if (cart.length === 0) {
-    setPosMsg("Carrito vacío.");
-    return;
-  }
+  if (cart.length === 0) return setPosMsg("Carrito vacío.");
 
   const subtotal = cart.reduce((acc, it) => acc + (Number(it.price) * Number(it.qty)), 0);
   const discount = Math.max(0, Number(discountInput?.value || 0));
   const total = Math.max(0, subtotal - discount);
 
-  if (total <= 0) {
-    setPosMsg("El total debe ser mayor a 0.");
-    return;
-  }
+  if (total <= 0) return setPosMsg("El total debe ser mayor a 0.");
 
   // validar stock
   for (const it of cart) {
     const p = products.find(x => x.id === it.productId);
     if (!p) return setPosMsg("Un producto ya no existe.");
-    if (it.qty > p.stock) return setPosMsg(`Stock insuficiente: ${p.name}`);
+    if (Number(it.qty) > Number(p.stock)) return setPosMsg(`Stock insuficiente: ${p.name}`);
   }
 
   // descontar stock
@@ -468,13 +437,13 @@ function checkout() {
   }
   saveAllProducts(allProducts);
 
-  // ✅ VENTA (CORREGIDA) — compatible con el resto del archivo
+  // registrar venta
   const sale = {
     id: crypto.randomUUID(),
     businessId: ctx.biz.id,
     createdAt: new Date().toISOString(),
     items: cart.map(item => ({
-      productId: item.productId, // ✅ era item.id (mal)
+      productId: item.productId,
       name: item.name,
       price: item.price,
       qty: item.qty
@@ -496,6 +465,7 @@ function checkout() {
   // limpiar
   cart = [];
   if (discountInput) discountInput.value = "0";
+
   renderProducts(productSearch?.value || "");
   renderCart();
   renderSales();
@@ -504,13 +474,43 @@ function checkout() {
   setTimeout(() => clearPosMsg(), 1800);
 }
 
-// ===== Events wiring =====
-function wireEvents() {
-  btnLogout?.addEventListener("click", () => {
+// ===== Logout modal wiring (POS) =====
+function wireLogout() {
+  const btnLogout = document.getElementById("btnLogoutDash"); 
+  const btnLogoutMobile = document.getElementById("btnLogoutDashMobile"); 
+  const logoutModalEl = document.getElementById("logoutModal");
+  const confirmBtn = document.getElementById("confirmLogout");
+
+  // Si no hay botón, no hacemos nada
+  if (!btnLogout && !btnLogoutMobile) return;
+
+  // Si no hay modal, fallback: confirm normal
+  if (!logoutModalEl || !window.bootstrap?.Modal) {
+    const fallback = () => {
+      if (confirm("¿Seguro que deseas cerrar sesión?")) {
+        clearSession();
+        window.location.href = "Index.html";
+      }
+    };
+    btnLogout?.addEventListener("click", fallback);
+    btnLogoutMobile?.addEventListener("click", fallback);
+    return;
+  }
+
+  const logoutModal = bootstrap.Modal.getOrCreateInstance(logoutModalEl);
+
+  btnLogout?.addEventListener("click", () => logoutModal.show());
+  btnLogoutMobile?.addEventListener("click", () => logoutModal.show());
+
+  confirmBtn?.addEventListener("click", () => {
     clearSession();
     window.location.href = "Index.html";
   });
+}
 
+// ===== Events wiring =====
+function wireEvents() {
+  // Productos
   btnOpenProductModal?.addEventListener("click", openNewProduct);
   btnSaveProduct?.addEventListener("click", saveProductFromModal);
 
@@ -529,6 +529,7 @@ function wireEvents() {
     if (act === "del") deleteProduct(id);
   });
 
+  // Buscar en caja (Enter)
   posSearch?.addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
     const q = (posSearch.value || "").trim().toLowerCase();
@@ -537,14 +538,13 @@ function wireEvents() {
     const first = products.find(p =>
       p.name.toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q)
     );
-    if (!first) {
-      setPosMsg("No encontré ese producto.");
-      return;
-    }
+    if (!first) return setPosMsg("No encontré ese producto.");
+
     addToCart(first.id);
     posSearch.value = "";
   });
 
+  // Carrito
   cartList?.addEventListener("click", (e) => {
     const btn = e.target.closest("button");
     if (!btn) return;
@@ -562,10 +562,13 @@ function wireEvents() {
 
   btnClearCart?.addEventListener("click", clearCart);
   btnCheckout?.addEventListener("click", checkout);
+
+  // Logout (modal)
+  wireLogout();
 }
 
 // ===== Init =====
-(function init() {
+document.addEventListener("DOMContentLoaded", () => {
   ctx = requireAuth();
   if (!ctx) return;
 
@@ -579,4 +582,4 @@ function wireEvents() {
   renderSales();
 
   wireEvents();
-})();
+});

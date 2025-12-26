@@ -146,13 +146,35 @@ function setupNav() {
 
 
 function setupLogout() {
+  const btn1 = document.getElementById("btnLogoutDash");
+  const btn2 = document.getElementById("btnLogoutDashMobile");
+
+  const modalEl = document.getElementById("logoutModalDash");
+  const confirmBtn = document.getElementById("confirmLogoutDash");
+
   const doLogout = () => {
     clearSession();
     window.location.href = "Index.html";
   };
-  document.getElementById("btnLogoutDash")?.addEventListener("click", doLogout);
-  document.getElementById("btnLogoutDashMobile")?.addEventListener("click", doLogout);
+
+  // Fallback si no existe modal o bootstrap
+  if (!modalEl || !window.bootstrap?.Modal) {
+    const handler = () => {
+      if (confirm("¿Seguro que deseas cerrar sesión?")) doLogout();
+    };
+    btn1?.addEventListener("click", handler);
+    btn2?.addEventListener("click", handler);
+    return;
+  }
+
+  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+  btn1?.addEventListener("click", () => modal.show());
+  btn2?.addEventListener("click", () => modal.show());
+
+  confirmBtn?.addEventListener("click", doLogout);
 }
+
 
 
 function setupEditBiz() {
@@ -415,6 +437,37 @@ function escapeHtml(str){
 document.addEventListener("DOMContentLoaded", () => {
   const modalEl = document.getElementById("postModal");
   if (!modalEl) return;
+
+
+// ===== Logout modal =====
+function wireLogoutReportes() {
+  const btn = document.getElementById("btnLogoutRep");
+  const modalEl = document.getElementById("logoutModal");
+  const confirmBtn = document.getElementById("confirmLogout");
+
+  if (!btn) return;
+
+  // fallback si no hay modal o bootstrap
+  if (!modalEl || !window.bootstrap?.Modal) {
+    btn.addEventListener("click", () => {
+      if (confirm("¿Seguro que deseas cerrar sesión?")) {
+        clearSession();
+        window.location.href = "Index.html";
+      }
+    });
+    return;
+  }
+
+  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+  btn.addEventListener("click", () => modal.show());
+
+  confirmBtn?.addEventListener("click", () => {
+    clearSession();
+    window.location.href = "Index.html";
+  });
+}
+
 
   // usa getOrCreateInstance para evitar bugs
   const modal = bootstrap.Modal.getOrCreateInstance(modalEl);

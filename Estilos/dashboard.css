@@ -552,3 +552,92 @@ a.nav-item:hover{
     max-height: 240px;
   }
 }
+
+/* ===== MODAL PRO ===== */
+.modal-dark {
+  background: linear-gradient(
+    180deg,
+    rgba(20, 25, 35, 0.98),
+    rgba(11, 15, 20, 0.98)
+  );
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(14px);
+}
+
+/* Header */
+.modal-dark .modal-header {
+  padding: 18px 20px 14px;
+}
+
+.modal-dark .modal-title {
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 0.2px;
+}
+
+/* Body */
+.modal-dark .modal-body {
+  padding: 10px 20px 18px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Footer */
+.modal-dark .modal-footer {
+  padding: 14px 20px 18px;
+  gap: 10px;
+}
+
+/* Botón cerrar (X) */
+.modal-dark .btn-close {
+  filter: invert(1);
+  opacity: 0.65;
+}
+.modal-dark .btn-close:hover {
+  opacity: 1;
+}
+
+/* ===== BOTONES ===== */
+.modal-dark .btn-soft {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border-radius: 12px;
+  padding: 8px 14px;
+}
+.modal-dark .btn-soft:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* Botón peligro */
+.modal-dark .btn-danger {
+  background: linear-gradient(
+    180deg,
+    #dc3545,
+    #b02a37
+  );
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  padding: 8px 16px;
+  box-shadow: 0 6px 18px rgba(220, 53, 69, 0.35);
+}
+.modal-dark .btn-danger:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 8px 22px rgba(220, 53, 69, 0.45);
+}
+
+/* ===== BACKDROP ===== */
+.modal-backdrop.show {
+  background: radial-gradient(
+    circle at top,
+    rgba(13, 110, 253, 0.18),
+    rgba(0, 0, 0, 0.85)
+  );
+  opacity: 1;
+}
