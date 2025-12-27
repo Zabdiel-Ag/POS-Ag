@@ -1,19 +1,33 @@
-// Keys (mismas que tu app.js)
+
 const USERS_KEY = "pos_users";
 const SESSION_KEY = "pos_session";
 const BUSINESSES_KEY = "pos_businesses";
+const POSTS_KEY = "pos_posts";
+
+// =======================
+// Helpers base
+// =======================
+function safeJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
 
 function getUsers() {
-  try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; } catch { return []; }
+  return safeJSON(USERS_KEY, []);
 }
 function getSession() {
-  try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; }
+  return safeJSON(SESSION_KEY, null);
 }
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 function getBusinesses() {
-  try { return JSON.parse(localStorage.getItem(BUSINESSES_KEY)) || []; } catch { return []; }
+  return safeJSON(BUSINESSES_KEY, []);
 }
 function getBusinessByOwner(userId) {
   return getBusinesses().find(b => b.ownerUserId === userId) || null;
@@ -35,7 +49,6 @@ function requireAuthOrRedirect() {
 
   const biz = getBusinessByOwner(session.userId);
   if (!biz) {
-    // si no hay empresa, regresa al wizard (Index)
     window.location.href = "Index.html";
     return null;
   }
@@ -50,8 +63,8 @@ function initialsFromName(name) {
   return (a + b).toUpperCase();
 }
 
+
 function renderBusiness(biz) {
-  // Right panel
   const bizNameRight = document.getElementById("bizNameRight");
   const bizCategoryRight = document.getElementById("bizCategoryRight");
   const bizHandleRight = document.getElementById("bizHandleRight");
@@ -61,11 +74,10 @@ function renderBusiness(biz) {
   if (bizNameRight) bizNameRight.textContent = biz.name;
   if (bizCategoryRight) bizCategoryRight.textContent = biz.category;
   if (bizHandleRight) bizHandleRight.textContent = "@" + biz.handle;
-  // Mini label
+
   const bizMiniLabel = document.getElementById("bizMiniLabel");
   if (bizMiniLabel) bizMiniLabel.textContent = "@" + biz.handle;
 
-  // Feed header
   const bizNameFeed = document.getElementById("bizNameFeed");
   const bizHandleFeed = document.getElementById("bizHandleFeed");
   const bizCategoryFeed = document.getElementById("bizCategoryFeed");
@@ -101,24 +113,57 @@ function renderBusiness(biz) {
   }
 }
 
-function renderTeamDemo() {
+// =======================
+// TEAM (demo o real si existe)
+// =======================
+function readTeamForBiz(bizId) {
+  // Intenta encontrar data real en varias llaves comunes
+  const candidates = [
+    "pos_team",
+    "pos_employees",
+    "pos_staff",
+    "pos_users_business",
+    "pos_connected_users"
+  ];
+
+  for (const k of candidates) {
+    const arr = safeJSON(k, null);
+    if (!Array.isArray(arr)) continue;
+
+    // Filtra por negocio si viene con businessId
+    const filtered = arr.filter(x => !x || typeof x !== "object" ? false : (x.businessId ? x.businessId === bizId : true));
+    if (filtered.length) return filtered;
+  }
+  return null;
+}
+
+function renderTeam(ctx) {
   const teamList = document.getElementById("teamList");
   if (!teamList) return;
 
+  const real = readTeamForBiz(ctx.biz.id);
+
   const demo = [
-    { name: "Mariana", info: "Rol: Cajero" },
-    { name: "Luis", info: "Rol: Inventario" },
-    { name: "Andrea", info: "Rol: Admin" },
-    { name: "Héctor", info: "Rol: Ventas" },
+    { name: "Mariana", role: "Cajero" },
+    { name: "Luis", role: "Inventario" },
+    { name: "Andrea", role: "Admin" },
+    { name: "Héctor", role: "Ventas" },
   ];
 
-  teamList.innerHTML = demo.map(x => `
+  const list = (real && real.length)
+    ? real.map(x => ({
+        name: x.name || x.fullName || x.username || "Usuario",
+        role: x.role || x.rol || x.position || "Empleado",
+      }))
+    : demo;
+
+  teamList.innerHTML = list.map(x => `
     <div class="suggest">
       <div class="suggest-left">
         <div class="suggest-avatar">${initialsFromName(x.name)}</div>
         <div>
           <div class="fw-semibold">${x.name}</div>
-          <div class="small2">${x.info}</div>
+          <div class="small2">Rol: ${x.role}</div>
         </div>
       </div>
       <button class="btn btn-link btn-sm link-light" style="text-decoration:none;">Conectar</button>
@@ -126,84 +171,25 @@ function renderTeamDemo() {
   `).join("");
 }
 
+// =======================
+// NAV (topbar icons)
+// =======================
 function setupNav() {
   const buttons = document.querySelectorAll(".nav-item");
-
   buttons.forEach(btn => {
     btn.addEventListener("click", () => {
       buttons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
       const screen = btn.getAttribute("data-screen");
-      console.log("Nav:", screen);
-
-      if (screen === "pos") {
-        window.location.href = "Pos.html";
-      }
+      if (screen === "pos") window.location.href = "Pos.html";
+      // aquí puedes agregar inventory.html / reportes.html cuando existan
     });
   });
 }
 
-
-function setupLogout() {
-  const btn1 = document.getElementById("btnLogoutDash");
-  const btn2 = document.getElementById("btnLogoutDashMobile");
-
-  const modalEl = document.getElementById("logoutModalDash");
-  const confirmBtn = document.getElementById("confirmLogoutDash");
-
-  const doLogout = () => {
-    clearSession();
-    window.location.href = "Index.html";
-  };
-
-  // Fallback si no existe modal o bootstrap
-  if (!modalEl || !window.bootstrap?.Modal) {
-    const handler = () => {
-      if (confirm("¿Seguro que deseas cerrar sesión?")) doLogout();
-    };
-    btn1?.addEventListener("click", handler);
-    btn2?.addEventListener("click", handler);
-    return;
-  }
-
-  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-
-  btn1?.addEventListener("click", () => modal.show());
-  btn2?.addEventListener("click", () => modal.show());
-
-  confirmBtn?.addEventListener("click", doLogout);
-}
-
-
-
-function setupEditBiz() {
-  // Por ahora, “Cambiar” te regresa a Index para editar (luego hacemos modal real)
-  document.getElementById("btnEditBiz")?.addEventListener("click", () => {
-    window.location.href = "Index.html";
-  });
-}
-
-// INIT este cabron no moverle
-(function init() {
-  const data = requireAuthOrRedirect();
-  if (!data) return;
-
-  // esto es CLAVE para publicar posts
-  window.__CTX__ = data;
-
-  renderBusiness(data.biz);
-  renderTeamDemo();
-  setupNav();
-  setupLogout();
-  setupEditBiz();
-
-  renderFeed(data);
-})();
-
-
-
-(function setupBottomNav() {
+// Bottom nav (si existe)
+function setupBottomNav() {
   const items = document.querySelectorAll(".bottom-nav .bn-item");
   if (!items.length) return;
 
@@ -213,73 +199,307 @@ function setupEditBiz() {
       a.classList.add("active");
     });
   });
-})();
-
-// ====== POSTS (Marketing Feed) ======
-const POSTS_KEY = "pos_posts";
-
-// Lee posts
-function getPosts() {
-  try { return JSON.parse(localStorage.getItem(POSTS_KEY)) || []; }
-  catch { return []; }
 }
 
-// Guarda posts
+// =======================
+// LOGOUT (modal + fallback)
+// Respeta IDs existentes:
+// btnLogoutDash, btnLogoutDashMobile (si existe)
+// logoutModal, confirmLogout (tu modal actual)
+// También soporta legacy: logoutModalDash / confirmLogoutDash
+// =======================
+function setupLogout() {
+  const btn1 = document.getElementById("btnLogoutDash");
+  const btn2 = document.getElementById("btnLogoutDashMobile");
+
+  const modalEl =
+    document.getElementById("logoutModal") ||
+    document.getElementById("logoutModalDash");
+
+  const confirmBtn =
+    document.getElementById("confirmLogout") ||
+    document.getElementById("confirmLogoutDash");
+
+  const doLogout = () => {
+    clearSession();
+    window.location.href = "Index.html";
+  };
+
+  const fallback = () => {
+    if (confirm("¿Seguro que deseas cerrar sesión?")) doLogout();
+  };
+
+  // Si no hay modal o bootstrap, fallback
+  if (!modalEl || !window.bootstrap?.Modal) {
+    btn1?.addEventListener("click", fallback);
+    btn2?.addEventListener("click", fallback);
+    return;
+  }
+
+  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+  btn1?.addEventListener("click", () => modal.show());
+  btn2?.addEventListener("click", () => modal.show());
+
+  confirmBtn?.addEventListener("click", doLogout);
+}
+
+// =======================
+// THEME (modo oscuro / claro)
+// IDs: btnTheme + mirror btnThemeMirror
+// =======================
+function setupTheme() {
+  const btn = document.getElementById("btnTheme");
+  if (!btn) return;
+
+  const KEY = "dash_theme";
+  const saved = localStorage.getItem(KEY);
+
+  if (saved === "light") document.body.classList.add("theme-light");
+
+  const paintIcon = () => {
+    const isLight = document.body.classList.contains("theme-light");
+    btn.innerHTML = isLight
+      ? '<i class="bi bi-sun"></i>'
+      : '<i class="bi bi-moon-stars"></i>';
+  };
+
+  paintIcon();
+
+  btn.addEventListener("click", () => {
+    document.body.classList.toggle("theme-light");
+    localStorage.setItem(KEY, document.body.classList.contains("theme-light") ? "light" : "dark");
+    paintIcon();
+  });
+
+  // mirror (lado izquierdo)
+  const mirror = document.getElementById("btnThemeMirror");
+  if (mirror) mirror.addEventListener("click", () => btn.click());
+}
+
+// =======================
+// KPIs (Resumen) — NO cambia tus IDs
+// IDs esperados:
+// kpiIngresos, kpiTickets, kpiInventario, kpiAlertas
+// sumVentasHoy, sumProductos, sumStockBajo, sumConectados
+// =======================
+function fmtMoney(n) {
+  const x = Number(n || 0);
+  try {
+    return x.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+  } catch {
+    return "$" + x.toFixed(2);
+  }
+}
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+// Busca arrays en localStorage por múltiples keys
+function findArrayFromStorage(keys) {
+  for (const k of keys) {
+    const v = safeJSON(k, null);
+    if (Array.isArray(v)) return { key: k, arr: v };
+  }
+  return null;
+}
+
+function normalizeDateOnly(d) {
+  const dd = new Date(d);
+  if (isNaN(dd.getTime())) return null;
+  return dd.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+function renderKpis(ctx) {
+  // Candidatos de ventas
+  const salesHit = findArrayFromStorage([
+    "pos_sales",
+    "pos_orders",
+    "pos_transactions",
+    "pos_receipts",
+    "pos_tickets"
+  ]);
+
+  // Candidatos de productos/inventario
+  const prodHit = findArrayFromStorage([
+    "pos_products",
+    "pos_inventory",
+    "pos_stock",
+    "pos_items"
+  ]);
+
+  // Candidatos de alertas (opcional)
+  const alertHit = findArrayFromStorage([
+    "pos_alerts",
+    "pos_notifications",
+    "pos_warnings"
+  ]);
+
+  // Team conectado
+  const team = readTeamForBiz(ctx.biz.id);
+  const connectedCount = Array.isArray(team) ? team.length : 0;
+
+  // ===== SALES KPIs =====
+  let ingresosHoy = 0;
+  let ticketsHoy = 0;
+
+  if (salesHit?.arr?.length) {
+    const today = new Date().toISOString().slice(0, 10);
+
+    const mine = salesHit.arr.filter(x => {
+      if (!x || typeof x !== "object") return false;
+      if (x.businessId && x.businessId !== ctx.biz.id) return false;
+      return true;
+    });
+
+    const todaySales = mine.filter(x => {
+      const dateKey = x.date || x.createdAt || x.timestamp || x.time || x.fecha;
+      const d = normalizeDateOnly(dateKey);
+      return d === today;
+    });
+
+    // ingresos: total/amount
+    ingresosHoy = todaySales.reduce((acc, x) => {
+      const amount =
+        x.total ?? x.amount ?? x.importe ?? x.totalAmount ?? x.paymentTotal ?? 0;
+      return acc + Number(amount || 0);
+    }, 0);
+
+    // tickets: count o items
+    ticketsHoy = todaySales.length;
+  }
+
+  // ===== INVENTORY KPIs =====
+  let totalProductos = 0;
+  let stockBajo = 0;
+
+  if (prodHit?.arr?.length) {
+    const mine = prodHit.arr.filter(x => {
+      if (!x || typeof x !== "object") return false;
+      if (x.businessId && x.businessId !== ctx.biz.id) return false;
+      return true;
+    });
+
+    totalProductos = mine.length;
+
+    stockBajo = mine.reduce((acc, x) => {
+      const qty = Number(x.stock ?? x.qty ?? x.quantity ?? x.existencias ?? 0);
+      const min = Number(x.minStock ?? x.min ?? x.lowStock ?? x.stockMin ?? 0);
+      if (min > 0 && qty <= min) return acc + 1;
+      // fallback heurística: qty <= 3
+      if (min === 0 && qty > 0 && qty <= 3) return acc + 1;
+      return acc;
+    }, 0);
+  }
+
+  // ===== ALERTAS =====
+  let alertasPendientes = 0;
+
+  // si hay alertas guardadas, usa esas; si no, calcula por stock bajo
+  if (alertHit?.arr?.length) {
+    const mine = alertHit.arr.filter(x => {
+      if (!x || typeof x !== "object") return false;
+      if (x.businessId && x.businessId !== ctx.biz.id) return false;
+      const status = (x.status || x.state || x.estado || "").toString().toLowerCase();
+      return status ? status !== "done" && status !== "closed" && status !== "resuelto" : true;
+    });
+    alertasPendientes = mine.length;
+  } else {
+    alertasPendientes = stockBajo;
+  }
+
+  // ===== Pintar en tus IDs =====
+  // Top KPIs (tarjetitas)
+  setText("kpiIngresos", ingresosHoy ? fmtMoney(ingresosHoy) : "—");
+  setText("kpiTickets", ticketsHoy ? String(ticketsHoy) : "—");
+  setText("kpiInventario", totalProductos ? String(totalProductos) : "—");
+  setText("kpiAlertas", alertasPendientes ? String(alertasPendientes) : "—");
+
+  // Desglose (lista inferior)
+  setText("sumVentasHoy", ingresosHoy ? fmtMoney(ingresosHoy) : "—");
+  setText("sumProductos", totalProductos ? String(totalProductos) : "—");
+  setText("sumStockBajo", stockBajo ? String(stockBajo) : "—");
+  setText("sumConectados", connectedCount ? String(connectedCount) : "—");
+}
+
+// Botón “Ver desglose” (si existe)
+function setupBreakdownToggle() {
+  const btn = document.getElementById("btnBreakdown");
+  const box = document.getElementById("breakdownBox");
+  if (!btn || !box) return;
+
+  btn.addEventListener("click", () => {
+    box.classList.toggle("d-none");
+  });
+}
+
+// =======================
+// POSTS (Marketing Feed)
+// =======================
+function getPosts() {
+  return safeJSON(POSTS_KEY, []);
+}
 function savePosts(posts) {
   localStorage.setItem(POSTS_KEY, JSON.stringify(posts));
 }
 
-function showErr(el, msg){
-  if(!el) return;
+function showErr(el, msg) {
+  if (!el) return;
   el.textContent = msg;
   el.classList.remove("d-none");
 }
-function hideErr(el){
-  if(!el) return;
+function hideErr(el) {
+  if (!el) return;
   el.textContent = "";
   el.classList.add("d-none");
 }
-function fileToDataUrl(file){
-  return new Promise((resolve, reject)=>{
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(String(r.result));
     r.onerror = reject;
     r.readAsDataURL(file);
   });
 }
-
-function timeAgo(iso){
+function timeAgo(iso) {
   const d = new Date(iso);
-  const s = Math.floor((Date.now() - d.getTime())/1000);
-  if(s < 60) return `${s}s`;
-  const m = Math.floor(s/60); if(m < 60) return `${m}m`;
-  const h = Math.floor(m/60); if(h < 24) return `${h}h`;
-  const days = Math.floor(h/24); return `${days}d`;
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60); if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}h`;
+  const days = Math.floor(h / 24); return `${days}d`;
+}
+function escapeHtml(str) {
+  return String(str || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-// Render del feed en #feed
-function renderFeed(ctx){
+function renderFeed(ctx) {
   const feed = document.getElementById("feed");
-  if(!feed) return;
+  if (!feed) return;
 
-  // Trae solo posts de esta empresa
   const posts = getPosts()
     .filter(p => p.businessId === ctx.biz.id)
-    .sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  // Si no hay posts, deja tu placeholder y ya
   const existingPlaceholder = feed.querySelector('[data-placeholder="true"]');
-  if(posts.length === 0){
-    if(!existingPlaceholder){
-      // si quieres, aquí puedes agregar un placeholder automático
+
+  if (posts.length === 0) {
+    // si ya tienes placeholder fijo, lo dejamos
+    if (!existingPlaceholder) {
+      // opcional: podrías poner uno aquí si quieres
     }
     return;
   }
 
-  // Limpia y pinta
   feed.innerHTML = posts.map(p => {
     const headerName = ctx.biz.name;
-    const headerHandle = "@"+ctx.biz.handle;
+    const headerHandle = "@" + ctx.biz.handle;
     const label = p.type?.toUpperCase() || "POST";
 
     const mediaHtml = p.mediaType?.startsWith("video/")
@@ -290,7 +510,7 @@ function renderFeed(ctx){
       <article class="post cardx p-3">
         <div class="d-flex justify-content-between align-items-center">
           <div class="d-flex align-items-center gap-2">
-            <div class="avatar">${(headerName||"E")[0].toUpperCase()}</div>
+            <div class="avatar">${(headerName || "E")[0].toUpperCase()}</div>
             <div>
               <div class="fw-semibold">${headerName}</div>
               <div class="small muted">${headerHandle} · ${timeAgo(p.createdAt)} · <span class="badge-soft px-2 py-1">${label}</span></div>
@@ -312,38 +532,26 @@ function renderFeed(ctx){
     `;
   }).join("");
 
-  // Eventos: borrar / copiar
-  feed.querySelectorAll("[data-del-post]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
+  feed.querySelectorAll("[data-del-post]").forEach(btn => {
+    btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-del-post");
       const all = getPosts();
-      const filtered = all.filter(x => x.id !== id);
-      savePosts(filtered);
+      savePosts(all.filter(x => x.id !== id));
       renderFeed(ctx);
     });
   });
 
-  feed.querySelectorAll("[data-copy]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
+  feed.querySelectorAll("[data-copy]").forEach(btn => {
+    btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-copy");
-      const p = getPosts().find(x=>x.id===id);
-      if(!p) return;
+      const p = getPosts().find(x => x.id === id);
+      if (!p) return;
       navigator.clipboard?.writeText(p.caption || "");
     });
   });
 }
 
-// Para evitar inyección al mostrar texto
-function escapeHtml(str){
-  return String(str||"")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-
-(function setupCreatePost(){
+function setupCreatePost() {
   const btnOpen = document.getElementById("btnOpenPost");
   const input = document.getElementById("postMedia");
   const caption = document.getElementById("postCaption");
@@ -355,35 +563,44 @@ function escapeHtml(str){
   const img = document.getElementById("postPreviewImg");
   const vid = document.getElementById("postPreviewVideo");
 
-  if(!btnOpen || !btnPublish) return;
+  if (!btnOpen || !btnPublish) return;
+
+  const modalEl = document.getElementById("postModal");
+  const hasBootstrapModal = modalEl && window.bootstrap?.Modal;
 
   let mediaDataUrl = "";
   let mediaType = "";
 
-  const modalEl = document.getElementById("postModal");
-  const modal = new bootstrap.Modal(modalEl);
-
-  btnOpen.addEventListener("click", ()=>{
-    // reset
+  const openModal = () => {
     hideErr(err);
-    if(input) input.value = "";
-    if(caption) caption.value = "";
-    if(type) type.value = "promo";
+    if (input) input.value = "";
+    if (caption) caption.value = "";
+    if (type) type.value = "promo";
     mediaDataUrl = "";
     mediaType = "";
     previewWrap?.classList.add("d-none");
     img?.classList.add("d-none");
     vid?.classList.add("d-none");
-    modal.show();
-  });
 
-  input?.addEventListener("change", async (e)=>{
+    if (!hasBootstrapModal) {
+      alert("Falta Bootstrap Modal para abrir el creador de post.");
+      return;
+    }
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  };
+
+  btnOpen.addEventListener("click", openModal);
+
+  // Mirror del composer (si existe)
+  const openComposer = document.getElementById("btnOpenPostMirror");
+  if (openComposer) openComposer.addEventListener("click", () => btnOpen.click());
+
+  input?.addEventListener("change", async (e) => {
     hideErr(err);
     const file = e.target.files?.[0];
-    if(!file) return;
+    if (!file) return;
 
-    // límite MVP
-    if(file.size > 12 * 1024 * 1024){
+    if (file.size > 12 * 1024 * 1024) {
       showErr(err, "Archivo muy pesado. Usa máximo 12MB (por ahora).");
       input.value = "";
       return;
@@ -394,25 +611,27 @@ function escapeHtml(str){
 
     previewWrap?.classList.remove("d-none");
 
-    if(mediaType.startsWith("video/")){
-      vid.src = mediaDataUrl;
-      vid.classList.remove("d-none");
-      img.classList.add("d-none");
+    if (mediaType.startsWith("video/")) {
+      if (vid) {
+        vid.src = mediaDataUrl;
+        vid.classList.remove("d-none");
+      }
+      img?.classList.add("d-none");
     } else {
-      img.src = mediaDataUrl;
-      img.classList.remove("d-none");
-      vid.classList.add("d-none");
+      if (img) {
+        img.src = mediaDataUrl;
+        img.classList.remove("d-none");
+      }
+      vid?.classList.add("d-none");
     }
   });
 
-  btnPublish.addEventListener("click", ()=>{
+  btnPublish.addEventListener("click", () => {
     hideErr(err);
 
-    // Necesitamos ctx (sesión + empresa)
     const ctx = window.__CTX__;
-    if(!ctx?.biz?.id) return showErr(err, "No hay empresa activa.");
-
-    if(!mediaDataUrl) return showErr(err, "Sube una foto o video para publicar.");
+    if (!ctx?.biz?.id) return showErr(err, "No hay empresa activa.");
+    if (!mediaDataUrl) return showErr(err, "Sube una foto o video para publicar.");
 
     const post = {
       id: crypto.randomUUID(),
@@ -428,75 +647,55 @@ function escapeHtml(str){
     posts.push(post);
     savePosts(posts);
 
-    modal.hide();
+    if (window.bootstrap?.Modal && document.getElementById("postModal")) {
+      bootstrap.Modal.getOrCreateInstance(document.getElementById("postModal")).hide();
+    }
     renderFeed(ctx);
   });
-})();
+}
 
-// ====== ABRIR MODAL desde Sidebar y BottomNav ======
-document.addEventListener("DOMContentLoaded", () => {
-  const modalEl = document.getElementById("postModal");
-  if (!modalEl) return;
-
-
-// ===== Logout modal =====
-function wireLogoutReportes() {
-  const btn = document.getElementById("btnLogoutRep");
-  const modalEl = document.getElementById("logoutModal");
-  const confirmBtn = document.getElementById("confirmLogout");
-
-  if (!btn) return;
-
-  // fallback si no hay modal o bootstrap
-  if (!modalEl || !window.bootstrap?.Modal) {
-    btn.addEventListener("click", () => {
-      if (confirm("¿Seguro que deseas cerrar sesión?")) {
-        clearSession();
-        window.location.href = "Index.html";
-      }
-    });
-    return;
-  }
-
-  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-
-  btn.addEventListener("click", () => modal.show());
-
-  confirmBtn?.addEventListener("click", () => {
-    clearSession();
+// =======================
+// EDIT BIZ (si existe botón)
+// =======================
+function setupEditBiz() {
+  document.getElementById("btnEditBiz")?.addEventListener("click", () => {
     window.location.href = "Index.html";
   });
 }
 
+// =======================
+// INIT (NO tocar) 😈
+// =======================
+(function init() {
+  const data = requireAuthOrRedirect();
+  if (!data) return;
 
-  // usa getOrCreateInstance para evitar bugs
-  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+  // CLAVE para publicar posts
+  window.__CTX__ = data;
 
-  function openPostModal(e) {
-    e?.preventDefault();
+  renderBusiness(data.biz);
+  renderTeam(data);
 
-    // reset básico (para que no se quede un preview viejo)
-    document.getElementById("postErr")?.classList.add("d-none");
-    const input = document.getElementById("postMedia");
-    const caption = document.getElementById("postCaption");
-    const type = document.getElementById("postType");
-    const previewWrap = document.getElementById("postPreviewWrap");
-    const img = document.getElementById("postPreviewImg");
-    const vid = document.getElementById("postPreviewVideo");
+  setupNav();
+  setupBottomNav();
 
-    if (input) input.value = "";
-    if (caption) caption.value = "";
-    if (type) type.value = "promo";
-    previewWrap?.classList.add("d-none");
-    img?.classList.add("d-none");
-    vid?.classList.add("d-none");
+  setupTheme();
+  setupLogout();
+  setupEditBiz();
 
-    modal.show();
-  }
+  setupBreakdownToggle();
+  renderKpis(data);
 
-  document.getElementById("btnCrear")?.addEventListener("click", openPostModal);
-  document.getElementById("btnContenido")?.addEventListener("click", openPostModal);
-  document.getElementById("btnContenidoMobile")?.addEventListener("click", openPostModal);
+  renderFeed(data);
+  setupCreatePost();
+})();
+
+//  Recalcula KPIs cuando regreses al tab o cambie storage
+window.addEventListener("focus", () => {
+  const ctx = window.__CTX__;
+  if (ctx) renderKpis(ctx);
 });
-
-
+window.addEventListener("storage", () => {
+  const ctx = window.__CTX__;
+  if (ctx) renderKpis(ctx);
+});

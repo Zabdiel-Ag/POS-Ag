@@ -1,7 +1,12 @@
 const SESSION_KEY = "pos_session";
 const USERS_KEY = "pos_users";
 const BUSINESSES_KEY = "pos_businesses";
+
+// ✅ IMPORTANTE: faltaba esta constante
 const SALES_KEY = "pos_sales_v1";
+
+// (no lo usas aquí, pero no estorba tenerlo)
+const PRODUCTS_KEY = "pos_products_v1";
 
 function jget(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
@@ -11,7 +16,14 @@ function getSession() { return jget(SESSION_KEY, null); }
 function clearSession() { localStorage.removeItem(SESSION_KEY); }
 function getUsers() { return jget(USERS_KEY, []); }
 function getBusinesses() { return jget(BUSINESSES_KEY, []); }
-function getSales() { return jget(SALES_KEY, []); }
+function getSales() { return jget(SALES_KEY, []).map(normalizeSale); }
+
+// ✅ compat: ventas nuevas usan bizId, viejas businessId
+function normalizeSale(s) {
+  if (!s) return s;
+  if (!s.bizId && s.businessId) s.bizId = s.businessId;
+  return s;
+}
 
 function requireBizOrRedirect() {
   const s = getSession();
@@ -110,10 +122,15 @@ function projection30(dailyValues) {
 
 // ===== Render =====
 function setKpis({ income, salesCount, avgTicket, proj30 }) {
-  document.getElementById("kpiIncome").textContent = money(income);
-  document.getElementById("kpiSales").textContent = String(salesCount);
-  document.getElementById("kpiAvg").textContent = money(avgTicket);
-  document.getElementById("kpiProjection").textContent = money(proj30);
+  const elIncome = document.getElementById("kpiIncome");
+  const elSales = document.getElementById("kpiSales");
+  const elAvg = document.getElementById("kpiAvg");
+  const elProj = document.getElementById("kpiProjection");
+
+  if (elIncome) elIncome.textContent = money(income);
+  if (elSales) elSales.textContent = String(salesCount);
+  if (elAvg) elAvg.textContent = money(avgTicket);
+  if (elProj) elProj.textContent = money(proj30);
 }
 
 function renderEmployeesTable(empArr) {
@@ -139,6 +156,7 @@ function renderEmployeesTable(empArr) {
 }
 
 function renderCharts(daily, methods, top, empArr) {
+  // Si no cargaste Chart.js en el HTML, no habrá gráficas
   if (!window.Chart) return;
 
   const ctxDaily = document.getElementById("chartDaily");
@@ -183,13 +201,15 @@ function applyFilters(allSales, bizId) {
   const method = document.getElementById("methodFilter")?.value || "";
 
   return allSales
-    .filter(s => s.businessId === bizId)
+    // ✅ CAMBIO CLAVE: filtrar por bizId (compat con businessId ya normalizado)
+    .filter(s => s.bizId === bizId)
     .filter(s => inRange(s.createdAt, from, to))
     .filter(s => !method || (s.method || "Efectivo") === method);
 }
 
 function renderAll(state) {
-  document.getElementById("bizLabel").textContent = `${state.biz.name} — @${state.biz.handle}`;
+  const bizLabel = document.getElementById("bizLabel");
+  if (bizLabel) bizLabel.textContent = `${state.biz.name} — @${state.biz.handle}`;
 
   const all = getSales();
   const filtered = applyFilters(all, state.biz.id);
@@ -222,8 +242,8 @@ function setDefaultDates() {
     return `${y}-${m}-${day}`;
   };
 
-  document.getElementById("fromDate").value = fmt(from);
-  document.getElementById("toDate").value = fmt(to);
+  document.getElementById("fromDate") && (document.getElementById("fromDate").value = fmt(from));
+  document.getElementById("toDate") && (document.getElementById("toDate").value = fmt(to));
 }
 
 // ===== Logout modal =====
@@ -234,7 +254,6 @@ function wireLogoutReportes() {
 
   if (!btn) return;
 
-  // fallback si no hay modal o bootstrap
   if (!modalEl || !window.bootstrap?.Modal) {
     btn.addEventListener("click", () => {
       if (confirm("¿Seguro que deseas cerrar sesión?")) {
@@ -246,9 +265,7 @@ function wireLogoutReportes() {
   }
 
   const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-
   btn.addEventListener("click", () => modal.show());
-
   confirmBtn?.addEventListener("click", () => {
     clearSession();
     window.location.href = "Index.html";

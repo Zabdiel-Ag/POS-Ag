@@ -1,21 +1,20 @@
-// ===== Keys (mismas del proyecto) =====
+
 const USERS_KEY = "pos_users";
 const SESSION_KEY = "pos_session";
 const BUSINESSES_KEY = "pos_businesses";
+
+// ✅ MISMO KEY que Inventario.js
 const PRODUCTS_KEY = "pos_products_v1";
 const SALES_KEY = "pos_sales_v1";
 
-// ===== Helpers storage =====
+// ---------- Storage ----------
 function jget(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
 }
-function jset(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
+function jset(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
 
 function getSession() { return jget(SESSION_KEY, null); }
 function clearSession() { localStorage.removeItem(SESSION_KEY); }
-
 function getUsers() { return jget(USERS_KEY, []); }
 function getBusinesses() { return jget(BUSINESSES_KEY, []); }
 
@@ -36,35 +35,52 @@ function requireAuth() {
   return { user, biz };
 }
 
-// ===== Data models =====
-function getAllProducts() { return jget(PRODUCTS_KEY, []); }
+// Backward compatible: si antes guardaste businessId / bizId mezclado
+function normalizeProduct(p) {
+  if (!p) return p;
+  if (!p.bizId && p.businessId) p.bizId = p.businessId;
+  return p;
+}
+function normalizeSale(s) {
+  if (!s) return s;
+  if (!s.bizId && s.businessId) s.bizId = s.businessId;
+  return s;
+}
+
+// Products
+function getAllProducts() { return jget(PRODUCTS_KEY, []).map(normalizeProduct); }
 function saveAllProducts(all) { jset(PRODUCTS_KEY, all); }
 function getProductsByBiz(bizId) { return getAllProducts().filter(p => p.bizId === bizId); }
 
-function getAllSales() { return jget(SALES_KEY, []); }
+// Sales
+function getAllSales() { return jget(SALES_KEY, []).map(normalizeSale); }
 function saveAllSales(all) { jset(SALES_KEY, all); }
 function getSalesByBiz(bizId) { return getAllSales().filter(s => s.bizId === bizId); }
 
+// ---------- Utils ----------
 function money(n) {
   const x = Number(n || 0);
   return x.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 }
-
 function isToday(isoString) {
   const d = new Date(isoString);
   const now = new Date();
-  return d.getFullYear() === now.getFullYear() &&
-         d.getMonth() === now.getMonth() &&
-         d.getDate() === now.getDate();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;").replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-// ===== State =====
+// ---------- State ----------
 let ctx = null; // {user,biz}
 let products = [];
 let sales = [];
 let cart = []; // {productId,name,price,qty}
 
-// ===== DOM =====
+// ---------- DOM ----------
 const bizLabel = document.getElementById("bizLabel");
 const todayTotalChip = document.getElementById("todayTotalChip");
 
@@ -84,30 +100,29 @@ const posMsg = document.getElementById("posMsg");
 const btnClearCart = document.getElementById("btnClearCart");
 const btnCheckout = document.getElementById("btnCheckout");
 
-// ===== SKU DOM (del modal) =====
-const pmSkuManual = document.getElementById("pmSkuManual");
-const btnGenSku = document.getElementById("btnGenSku");
-
-// ===== Modal producto (IDs de TU HTML) =====
+// Product modal
 const productModalEl = document.getElementById("productModal");
 const productModal = (productModalEl && window.bootstrap?.Modal)
   ? bootstrap.Modal.getOrCreateInstance(productModalEl)
   : null;
 
-const productModalTitle = document.getElementById("productModalTitle");
 const btnOpenProductModal = document.getElementById("btnOpenProductModal");
 const btnSaveProductModal = document.getElementById("btnSaveProductModal");
+const productModalTitle = document.getElementById("productModalTitle");
 const productModalError = document.getElementById("productModalError");
 
 const pmName = document.getElementById("pmName");
 const pmSku = document.getElementById("pmSku");
-const pmCategory = document.getElementById("pmCategory");
 const pmPrice = document.getElementById("pmPrice");
 const pmStock = document.getElementById("pmStock");
 const pmUnit = document.getElementById("pmUnit");
 const pmTrackStock = document.getElementById("pmTrackStock");
 
-// ===== Logout modal =====
+// SKU UI
+const pmSkuManual = document.getElementById("pmSkuManual");
+const btnGenSku = document.getElementById("btnGenSku");
+
+// Logout modal
 const btnLogoutDash = document.getElementById("btnLogoutDash");
 const logoutModalEl = document.getElementById("logoutModal");
 const confirmLogout = document.getElementById("confirmLogout");
@@ -115,7 +130,7 @@ const logoutModal = (logoutModalEl && window.bootstrap?.Modal)
   ? bootstrap.Modal.getOrCreateInstance(logoutModalEl)
   : null;
 
-// ===== UI helpers =====
+// ---------- UI helpers ----------
 function showError(el, msg) {
   if (!el) return;
   el.textContent = msg;
@@ -126,13 +141,12 @@ function hideError(el) {
   el.textContent = "";
   el.classList.add("d-none");
 }
-
-function setPosMsg(msg, isOk = false) {
+function setPosMsg(msg, ok = false) {
   if (!posMsg) return;
   posMsg.textContent = msg;
   posMsg.classList.remove("d-none");
-  posMsg.classList.toggle("alert-danger", !isOk);
-  posMsg.classList.toggle("alert-success", isOk);
+  posMsg.classList.toggle("alert-danger", !ok);
+  posMsg.classList.toggle("alert-success", ok);
 }
 function clearPosMsg() {
   if (!posMsg) return;
@@ -142,16 +156,7 @@ function clearPosMsg() {
   posMsg.classList.add("alert-danger");
 }
 
-function escapeHtml(s) {
-  return String(s ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-// ===== Render =====
+// ---------- Render ----------
 function renderBiz() {
   if (bizLabel) bizLabel.textContent = `${ctx.biz.name}  •  @${ctx.biz.handle}`;
 }
@@ -159,14 +164,14 @@ function renderBiz() {
 function renderProducts(filterText = "") {
   const q = filterText.trim().toLowerCase();
   const list = products
-    .filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .filter(p => !q || (p.name || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q))
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
   if (!productList) return;
   productList.innerHTML = "";
 
   if (list.length === 0) {
-    productList.innerHTML = `<div class="muted small">No hay productos todavía.</div>`;
+    productList.innerHTML = `<div class="muted small">No hay productos todavía (crea en Inventario y aquí aparecerán).</div>`;
     return;
   }
 
@@ -176,7 +181,9 @@ function renderProducts(filterText = "") {
     el.innerHTML = `
       <div>
         <div class="item-title">${escapeHtml(p.name)}</div>
-        <div class="item-sub">${money(p.price)} • Stock: ${Number(p.stock)} ${p.sku ? "• " + escapeHtml(p.sku) : ""}</div>
+        <div class="item-sub">
+          ${money(p.price)} • Stock: ${Number(p.stock || 0)} ${p.sku ? "• " + escapeHtml(p.sku) : ""}
+        </div>
       </div>
       <div class="d-flex align-items-center gap-2">
         <button class="btn btn-soft btn-sm" data-act="add" data-id="${p.id}">+ Carrito</button>
@@ -192,7 +199,7 @@ function renderCart() {
   cartList.innerHTML = "";
 
   if (cart.length === 0) {
-    cartList.innerHTML = `<div class="muted small">Carrito vacío. Busca un producto y agrégalo.</div>`;
+    cartList.innerHTML = `<div class="muted small">Carrito vacío. Busca un producto y presiona Enter.</div>`;
     updateTotals();
     return;
   }
@@ -205,7 +212,6 @@ function renderCart() {
         <div class="item-title">${escapeHtml(item.name)}</div>
         <div class="item-sub">${money(item.price)} c/u</div>
       </div>
-
       <div class="d-flex align-items-center gap-2">
         <button class="btn btn-soft btn-sm" data-act="dec" data-id="${item.productId}">-</button>
         <span class="badge badge-soft">${item.qty}</span>
@@ -217,6 +223,20 @@ function renderCart() {
   }
 
   updateTotals();
+}
+
+function renderTodayTotal() {
+  if (!todayTotalChip) return;
+  const totalToday = sales.filter(s => isToday(s.createdAt)).reduce((acc, s) => acc + Number(s.total || 0), 0);
+  todayTotalChip.textContent = `${money(totalToday)} hoy`;
+}
+
+function saleItemsPreview(items = []) {
+  // resumen tipo: "Coca x2, Pan x1"
+  const max = 2;
+  const parts = items.slice(0, max).map(it => `${it.name || "Producto"} x${Number(it.qty || 1)}`);
+  const rest = items.length - max;
+  return parts.join(", ") + (rest > 0 ? ` +${rest} más` : "");
 }
 
 function renderSales() {
@@ -236,30 +256,55 @@ function renderSales() {
     const when = new Date(s.createdAt);
     const hh = String(when.getHours()).padStart(2, "0");
     const mm = String(when.getMinutes()).padStart(2, "0");
-    const itemsCount = (s.items || []).reduce((a, x) => a + Number(x.qty || 0), 0);
+    const items = s.items || [];
+    const itemsCount = items.reduce((a, x) => a + Number(x.qty || 0), 0);
+    const collapseId = `sale_${s.id.replaceAll("-", "")}`;
 
     return `
       <div class="item">
-        <div>
-          <div class="item-title">${money(s.total)} <span class="muted">(${escapeHtml(s.method || "Efectivo")})</span></div>
-          <div class="item-sub">${when.toLocaleDateString("es-MX")} ${hh}:${mm} • ${itemsCount} artículos</div>
+        <div style="min-width:0;">
+          <div class="item-title">
+            ${money(s.total)}
+            <span class="muted">(${escapeHtml(s.method || "Efectivo")})</span>
+          </div>
+          <div class="item-sub">
+            ${when.toLocaleDateString("es-MX")} ${hh}:${mm} • ${itemsCount} artículos
+            <span class="muted">• ${escapeHtml(saleItemsPreview(items))}</span>
+          </div>
+
+          <div class="collapse mt-2" id="${collapseId}">
+            <div class="small muted">
+              ${items.map(it => `
+                <div class="d-flex justify-content-between">
+                  <span>${escapeHtml(it.name || "Producto")} <span class="muted">x${Number(it.qty || 1)}</span></span>
+                  <span>${money(Number(it.price || 0) * Number(it.qty || 1))}</span>
+                </div>
+              `).join("")}
+              <hr style="border-color: rgba(255,255,255,.10);" class="my-2" />
+              <div class="d-flex justify-content-between">
+                <span>Subtotal</span><span>${money(s.subtotal)}</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>Descuento</span><span>${money(s.discount)}</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <span class="chip">${isToday(s.createdAt) ? "Hoy" : "—"}</span>
+
+        <div class="d-flex flex-column align-items-end gap-2">
+          <span class="chip">${isToday(s.createdAt) ? "Hoy" : "—"}</span>
+          <button class="btn btn-soft btn-sm"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#${collapseId}">
+            Detalles
+          </button>
+        </div>
       </div>
     `;
   }).join("");
 
   renderTodayTotal();
-}
-
-function renderTodayTotal() {
-  if (!todayTotalChip) return;
-
-  const totalToday = sales
-    .filter(s => isToday(s.createdAt))
-    .reduce((acc, s) => acc + Number(s.total || 0), 0);
-
-  todayTotalChip.textContent = `${money(totalToday)} hoy`;
 }
 
 function updateTotals() {
@@ -271,7 +316,7 @@ function updateTotals() {
   if (totalLabel) totalLabel.textContent = money(total);
 }
 
-// ===== SKU helpers =====
+// ---------- SKU helpers ----------
 function sanitizeSkuPart(s) {
   return String(s || "")
     .trim()
@@ -281,38 +326,30 @@ function sanitizeSkuPart(s) {
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
 }
-
 function randomBase36(len = 4) {
   return Math.random().toString(36).slice(2, 2 + len).toUpperCase();
 }
-
 function skuExistsInBiz(sku) {
   const s = String(sku || "").trim().toLowerCase();
   return products.some(p => (p.sku || "").trim().toLowerCase() === s);
 }
-
 function generateSkuFromName(name) {
   const base = sanitizeSkuPart(name).slice(0, 12) || "PROD";
   return `${base}-${randomBase36(4)}`;
 }
-
 function generateUniqueSku(name) {
   let sku = generateSkuFromName(name);
   let tries = 0;
-  while (skuExistsInBiz(sku) && tries < 25) {
-    sku = generateSkuFromName(name);
-    tries++;
-  }
+  while (skuExistsInBiz(sku) && tries < 25) { sku = generateSkuFromName(name); tries++; }
   return sku;
 }
-
 function setSkuAutoFromName() {
   if (!pmSku || !pmName) return;
-  if (pmSkuManual?.checked) return; // solo si NO es manual
+  if (pmSkuManual?.checked) return;
   pmSku.value = generateUniqueSku(pmName.value);
 }
 
-// ===== Product modal actions =====
+// ---------- Product modal ----------
 function openNewProduct() {
   clearPosMsg();
   if (!productModal) return setPosMsg("Falta el modal de producto en el HTML.", false);
@@ -320,15 +357,13 @@ function openNewProduct() {
   hideError(productModalError);
   if (productModalTitle) productModalTitle.textContent = "Nuevo producto";
 
-  if (pmName) pmName.value = "";
-  if (pmSku) pmSku.value = "";
-  if (pmCategory) pmCategory.value = "";
-  if (pmPrice) pmPrice.value = "";
-  if (pmStock) pmStock.value = "";
-  if (pmUnit) pmUnit.value = "";
+  pmName.value = "";
+  pmPrice.value = "";
+  pmStock.value = "";
+  pmUnit.value = "";
   if (pmTrackStock) pmTrackStock.checked = true;
 
-  // SKU por defecto automático
+  // SKU automático por defecto
   if (pmSkuManual) pmSkuManual.checked = false;
   if (pmSku) {
     pmSku.disabled = true;
@@ -342,8 +377,7 @@ function saveProductFromModal() {
   hideError(productModalError);
 
   const name = (pmName?.value || "").trim();
-  let sku = (pmSku?.value || "").trim(); // OJO: let, porque lo vamos a modificar
-  const category = (pmCategory?.value || "").trim();
+  let sku = (pmSku?.value || "").trim();
   const unit = (pmUnit?.value || "").trim();
   const price = Number(pmPrice?.value || 0);
   const stock = Number(pmStock?.value || 0);
@@ -353,11 +387,10 @@ function saveProductFromModal() {
   if (!Number.isFinite(price) || price < 0) return showError(productModalError, "Precio inválido.");
   if (!Number.isFinite(stock) || stock < 0) return showError(productModalError, "Stock inválido.");
 
-  // ✅ SKU: si NO es manual, lo forzamos automático único
+  // SKU: si no es manual => siempre auto único
   if (!pmSkuManual?.checked) {
     sku = generateUniqueSku(name);
   } else {
-    // manual: si puso algo, validamos duplicado
     if (sku) {
       const exists = products.some(p => (p.sku || "").toLowerCase() === sku.toLowerCase());
       if (exists) return showError(productModalError, "Ese SKU ya existe.");
@@ -370,7 +403,6 @@ function saveProductFromModal() {
     bizId: ctx.biz.id,
     name,
     sku,
-    category,
     unit,
     price,
     stock: Math.floor(stock),
@@ -385,7 +417,6 @@ function saveProductFromModal() {
   productModal.hide();
 }
 
-// ===== Product delete =====
 function deleteProduct(id) {
   const p = products.find(x => x.id === id);
   if (!p) return;
@@ -402,7 +433,7 @@ function deleteProduct(id) {
   renderCart();
 }
 
-// ===== Cart actions =====
+// ---------- Cart actions ----------
 function addToCart(productId) {
   const p = products.find(x => x.id === productId);
   if (!p) return;
@@ -412,9 +443,7 @@ function addToCart(productId) {
   const item = cart.find(x => x.productId === productId);
   const currentQty = item ? item.qty : 0;
 
-  if ((p.trackStock ?? true) && currentQty + 1 > Number(p.stock)) {
-    return setPosMsg("No puedes agregar más, excede el stock.");
-  }
+  if ((p.trackStock ?? true) && currentQty + 1 > Number(p.stock)) return setPosMsg("No puedes agregar más, excede el stock.");
 
   clearPosMsg();
   if (!item) cart.push({ productId: p.id, name: p.name, price: p.price, qty: 1 });
@@ -430,15 +459,12 @@ function incCart(productId) {
   const p = products.find(x => x.id === productId);
   if (!p) return;
 
-  if ((p.trackStock ?? true) && item.qty + 1 > Number(p.stock)) {
-    return setPosMsg("No puedes agregar más, excede el stock.");
-  }
+  if ((p.trackStock ?? true) && item.qty + 1 > Number(p.stock)) return setPosMsg("No puedes agregar más, excede el stock.");
 
   clearPosMsg();
   item.qty += 1;
   renderCart();
 }
-
 function decCart(productId) {
   const item = cart.find(x => x.productId === productId);
   if (!item) return;
@@ -448,20 +474,18 @@ function decCart(productId) {
   if (item.qty <= 0) cart = cart.filter(x => x.productId !== productId);
   renderCart();
 }
-
 function removeFromCart(productId) {
   clearPosMsg();
   cart = cart.filter(x => x.productId !== productId);
   renderCart();
 }
-
 function clearCart() {
   clearPosMsg();
   cart = [];
   renderCart();
 }
 
-// ===== Checkout =====
+// ---------- Checkout ----------
 function checkout() {
   clearPosMsg();
   if (cart.length === 0) return setPosMsg("Carrito vacío.");
@@ -476,9 +500,7 @@ function checkout() {
   for (const it of cart) {
     const p = products.find(x => x.id === it.productId);
     if (!p) return setPosMsg("Un producto ya no existe.");
-    if ((p.trackStock ?? true) && Number(it.qty) > Number(p.stock)) {
-      return setPosMsg(`Stock insuficiente: ${p.name}`);
-    }
+    if ((p.trackStock ?? true) && Number(it.qty) > Number(p.stock)) return setPosMsg(`Stock insuficiente: ${p.name}`);
   }
 
   // descontar stock
@@ -487,15 +509,13 @@ function checkout() {
     const idx = allProducts.findIndex(x => x.id === it.productId && x.bizId === ctx.biz.id);
     if (idx !== -1) {
       const track = allProducts[idx].trackStock ?? true;
-      if (track) {
-        allProducts[idx].stock = Math.max(0, Number(allProducts[idx].stock) - Number(it.qty));
-      }
+      if (track) allProducts[idx].stock = Math.max(0, Number(allProducts[idx].stock) - Number(it.qty));
       allProducts[idx].updatedAt = new Date().toISOString();
     }
   }
   saveAllProducts(allProducts);
 
-  // registrar venta
+  // registrar venta (con NOMBRES dentro de items)
   const sale = {
     id: crypto.randomUUID(),
     bizId: ctx.biz.id,
@@ -516,11 +536,10 @@ function checkout() {
   allSales.push(sale);
   saveAllSales(allSales);
 
-  // refrescar data
+  // refrescar
   products = getProductsByBiz(ctx.biz.id);
   sales = getSalesByBiz(ctx.biz.id);
 
-  // limpiar
   cart = [];
   if (discountInput) discountInput.value = "0";
 
@@ -529,10 +548,10 @@ function checkout() {
   renderSales();
 
   setPosMsg(`Venta registrada: ${money(total)}`, true);
-  setTimeout(() => clearPosMsg(), 1800);
+  setTimeout(() => clearPosMsg(), 1600);
 }
 
-// ===== Logout wiring =====
+// ---------- Logout ----------
 function wireLogout() {
   if (!btnLogoutDash) return;
 
@@ -547,21 +566,20 @@ function wireLogout() {
   }
 
   btnLogoutDash.addEventListener("click", () => logoutModal.show());
-
   confirmLogout?.addEventListener("click", () => {
     clearSession();
     window.location.href = "Index.html";
   });
 }
 
-// ===== Events =====
+// ---------- Events ----------
 function wireEvents() {
   btnOpenProductModal?.addEventListener("click", openNewProduct);
   btnSaveProductModal?.addEventListener("click", saveProductFromModal);
 
   productSearch?.addEventListener("input", () => renderProducts(productSearch.value));
 
-  // ✅ listeners del SKU (van aquí, NO dentro de otros clicks)
+  // SKU
   pmName?.addEventListener("input", setSkuAutoFromName);
 
   pmSkuManual?.addEventListener("change", () => {
@@ -580,6 +598,7 @@ function wireEvents() {
     pmSku.value = generateUniqueSku(pmName?.value || "");
   });
 
+  // lista productos
   productList?.addEventListener("click", (e) => {
     const btn = e.target.closest("button");
     if (!btn) return;
@@ -591,14 +610,14 @@ function wireEvents() {
     if (act === "del") deleteProduct(id);
   });
 
-  // Buscar en caja (Enter)
+  // buscar y agregar (Enter)
   posSearch?.addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
     const q = (posSearch.value || "").trim().toLowerCase();
     if (!q) return;
 
     const first = products.find(p =>
-      p.name.toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q)
+      (p.name || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q)
     );
     if (!first) return setPosMsg("No encontré ese producto.");
 
@@ -606,11 +625,10 @@ function wireEvents() {
     posSearch.value = "";
   });
 
-  // Carrito
+  // carrito
   cartList?.addEventListener("click", (e) => {
     const btn = e.target.closest("button");
     if (!btn) return;
-
     const id = btn.getAttribute("data-id");
     const act = btn.getAttribute("data-act");
     if (!id || !act) return;
@@ -627,13 +645,14 @@ function wireEvents() {
   wireLogout();
 }
 
-// ===== Init =====
+// ---------- Init ----------
 document.addEventListener("DOMContentLoaded", () => {
   ctx = requireAuth();
   if (!ctx) return;
 
   renderBiz();
 
+  // ✅ aquí se cargan productos creados en Inventario
   products = getProductsByBiz(ctx.biz.id);
   sales = getSalesByBiz(ctx.biz.id);
 
