@@ -8,7 +8,6 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
 
-  <!-- ✅ sin "/" inicial para que no falle en GitHub Pages / subcarpetas -->
   <link rel="stylesheet" href="Estilos/POS.css" />
 </head>
 
@@ -29,7 +28,6 @@
         <div class="d-flex align-items-center gap-2">
           <span class="chip" id="todayTotalChip">$0.00 hoy</span>
 
-          <!-- ✅ ID corregido para que tu JS lo detecte -->
           <button class="btn btn-soft btn-sm" id="btnLogoutDash" type="button">
             Cerrar sesión
           </button>
@@ -37,7 +35,6 @@
       </div>
     </header>
 
-    <!-- CONTENT -->
     <main class="content">
 
       <!-- LEFT: PRODUCTS -->
@@ -113,7 +110,87 @@
     </main>
   </div>
 
-  <!-- ✅ Modal Cerrar Sesión -->
+<!-- PRODUCT MODAL (Agregar / Editar producto) -->
+<div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content modal-dark">
+      <div class="modal-header border-0">
+        <h5 class="modal-title" id="productModalTitle">Producto</h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal" type="button"></button>
+      </div>
+
+      <div class="modal-body">
+        <div id="productModalError" class="alert alert-danger py-2 d-none"></div>
+
+        <div class="mb-2">
+          <label class="form-label small muted">Nombre *</label>
+          <input id="pmName" class="form-control" placeholder="Ej: Coca 600ml" />
+        </div>
+
+        <!-- ✅ SKU (UNO SOLO) -->
+        <div class="mb-2">
+          <label class="form-label small muted">SKU</label>
+
+          <div class="d-flex gap-2 align-items-center">
+            <!-- un solo input -->
+            <input id="pmSku" class="form-control" placeholder="Se genera automático" disabled />
+
+            <!-- switch manual -->
+            <div class="d-flex align-items-center gap-2 px-2"
+              style="border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.06);">
+              <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" id="pmSkuManual">
+              </div>
+              <span class="small muted" style="white-space:nowrap;">Manual</span>
+            </div>
+
+            <!-- regenerar -->
+            <button class="btn btn-soft btn-sm" type="button" id="btnGenSku" title="Generar SKU">↻</button>
+          </div>
+
+          <div class="form-text muted">
+            Automático por defecto. Activa <b>Manual</b> si quieres escribirlo.
+          </div>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label small muted">Categoría (opcional)</label>
+          <input id="pmCategory" class="form-control" placeholder="Ej: Bebidas" />
+        </div>
+
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label small muted">Precio *</label>
+            <input id="pmPrice" class="form-control" type="number" step="0.01" min="0" placeholder="0.00" />
+          </div>
+          <div class="col-6">
+            <label class="form-label small muted">Stock *</label>
+            <input id="pmStock" class="form-control" type="number" step="1" min="0" placeholder="0" />
+          </div>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label small muted">Unidad (opcional)</label>
+          <input id="pmUnit" class="form-control" placeholder="Ej: pieza, caja, kg" />
+        </div>
+
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" id="pmTrackStock" checked>
+          <label class="form-check-label muted" for="pmTrackStock">Descontar stock en cada venta</label>
+        </div>
+      </div>
+
+      <div class="modal-footer border-0 d-flex gap-2">
+        <button class="btn btn-soft" data-bs-dismiss="modal" type="button">Cancelar</button>
+        <button id="btnSaveProductModal" class="btn btn-primary" type="button">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+  <!--  Modal Cerrar Sesión -->
   <div class="modal fade" id="logoutModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content modal-dark">
@@ -137,9 +214,7 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
-    integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
-    crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 
   <script src="JavaScript/POS.js"></script>
 </body>

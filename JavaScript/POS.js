@@ -39,26 +39,23 @@ function requireAuth() {
 // ===== Data models =====
 function getAllProducts() { return jget(PRODUCTS_KEY, []); }
 function saveAllProducts(all) { jset(PRODUCTS_KEY, all); }
-function getProductsByBiz(businessId) { return getAllProducts().filter(p => p.businessId === businessId); }
+function getProductsByBiz(bizId) { return getAllProducts().filter(p => p.bizId === bizId); }
 
 function getAllSales() { return jget(SALES_KEY, []); }
 function saveAllSales(all) { jset(SALES_KEY, all); }
-function getSalesByBiz(businessId) { return getAllSales().filter(s => s.businessId === businessId); }
+function getSalesByBiz(bizId) { return getAllSales().filter(s => s.bizId === bizId); }
 
 function money(n) {
   const x = Number(n || 0);
   return x.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 }
 
-function todayISODate() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 function isToday(isoString) {
-  return String(isoString || "").slice(0, 10) === todayISODate();
+  const d = new Date(isoString);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() &&
+         d.getMonth() === now.getMonth() &&
+         d.getDate() === now.getDate();
 }
 
 // ===== State =====
@@ -87,7 +84,11 @@ const posMsg = document.getElementById("posMsg");
 const btnClearCart = document.getElementById("btnClearCart");
 const btnCheckout = document.getElementById("btnCheckout");
 
-// ===== Modal producto (solo si existe en el HTML) =====
+// ===== SKU DOM (del modal) =====
+const pmSkuManual = document.getElementById("pmSkuManual");
+const btnGenSku = document.getElementById("btnGenSku");
+
+// ===== Modal producto (IDs de TU HTML) =====
 const productModalEl = document.getElementById("productModal");
 const productModal = (productModalEl && window.bootstrap?.Modal)
   ? bootstrap.Modal.getOrCreateInstance(productModalEl)
@@ -95,14 +96,24 @@ const productModal = (productModalEl && window.bootstrap?.Modal)
 
 const productModalTitle = document.getElementById("productModalTitle");
 const btnOpenProductModal = document.getElementById("btnOpenProductModal");
-const btnSaveProduct = document.getElementById("btnSaveProduct");
+const btnSaveProductModal = document.getElementById("btnSaveProductModal");
+const productModalError = document.getElementById("productModalError");
 
-const prodId = document.getElementById("prodId");
-const prodName = document.getElementById("prodName");
-const prodPrice = document.getElementById("prodPrice");
-const prodStock = document.getElementById("prodStock");
-const prodSku = document.getElementById("prodSku");
-const prodError = document.getElementById("prodError");
+const pmName = document.getElementById("pmName");
+const pmSku = document.getElementById("pmSku");
+const pmCategory = document.getElementById("pmCategory");
+const pmPrice = document.getElementById("pmPrice");
+const pmStock = document.getElementById("pmStock");
+const pmUnit = document.getElementById("pmUnit");
+const pmTrackStock = document.getElementById("pmTrackStock");
+
+// ===== Logout modal =====
+const btnLogoutDash = document.getElementById("btnLogoutDash");
+const logoutModalEl = document.getElementById("logoutModal");
+const confirmLogout = document.getElementById("confirmLogout");
+const logoutModal = (logoutModalEl && window.bootstrap?.Modal)
+  ? bootstrap.Modal.getOrCreateInstance(logoutModalEl)
+  : null;
 
 // ===== UI helpers =====
 function showError(el, msg) {
@@ -169,7 +180,6 @@ function renderProducts(filterText = "") {
       </div>
       <div class="d-flex align-items-center gap-2">
         <button class="btn btn-soft btn-sm" data-act="add" data-id="${p.id}">+ Carrito</button>
-        <button class="btn btn-soft btn-sm" data-act="edit" data-id="${p.id}">Editar</button>
         <button class="btn btn-outline-danger btn-sm" data-act="del" data-id="${p.id}">X</button>
       </div>
     `;
@@ -226,11 +236,13 @@ function renderSales() {
     const when = new Date(s.createdAt);
     const hh = String(when.getHours()).padStart(2, "0");
     const mm = String(when.getMinutes()).padStart(2, "0");
+    const itemsCount = (s.items || []).reduce((a, x) => a + Number(x.qty || 0), 0);
+
     return `
       <div class="item">
         <div>
-          <div class="item-title">${money(s.total)} <span class="muted">(${escapeHtml(s.method)})</span></div>
-          <div class="item-sub">${when.toLocaleDateString("es-MX")} ${hh}:${mm} • ${s.items.reduce((a, x) => a + Number(x.qty || 0), 0)} artículos</div>
+          <div class="item-title">${money(s.total)} <span class="muted">(${escapeHtml(s.method || "Efectivo")})</span></div>
+          <div class="item-sub">${when.toLocaleDateString("es-MX")} ${hh}:${mm} • ${itemsCount} artículos</div>
         </div>
         <span class="chip">${isToday(s.createdAt) ? "Hoy" : "—"}</span>
       </div>
@@ -243,14 +255,8 @@ function renderSales() {
 function renderTodayTotal() {
   if (!todayTotalChip) return;
 
-  const now = new Date();
   const totalToday = sales
-    .filter(s => {
-      const d = new Date(s.createdAt);
-      return d.getFullYear() === now.getFullYear()
-        && d.getMonth() === now.getMonth()
-        && d.getDate() === now.getDate();
-    })
+    .filter(s => isToday(s.createdAt))
     .reduce((acc, s) => acc + Number(s.total || 0), 0);
 
   todayTotalChip.textContent = `${money(totalToday)} hoy`;
@@ -265,86 +271,130 @@ function updateTotals() {
   if (totalLabel) totalLabel.textContent = money(total);
 }
 
-// ===== Actions: Products =====
-function openNewProduct() {
-  // si no tienes modal en el HTML, no hacemos nada
-  if (!productModal) return setPosMsg("Falta el modal de producto en el HTML.", false);
-
-  hideError(prodError);
-  if (prodId) prodId.value = "";
-  if (prodName) prodName.value = "";
-  if (prodPrice) prodPrice.value = "";
-  if (prodStock) prodStock.value = "";
-  if (prodSku) prodSku.value = "";
-  if (productModalTitle) productModalTitle.textContent = "Nuevo producto";
-  productModal.show();
+// ===== SKU helpers =====
+function sanitizeSkuPart(s) {
+  return String(s || "")
+    .trim()
+    .toUpperCase()
+    .replace(/Á/g, "A").replace(/É/g, "E").replace(/Í/g, "I").replace(/Ó/g, "O").replace(/Ú/g, "U").replace(/Ñ/g, "N")
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
-function openEditProduct(id) {
+function randomBase36(len = 4) {
+  return Math.random().toString(36).slice(2, 2 + len).toUpperCase();
+}
+
+function skuExistsInBiz(sku) {
+  const s = String(sku || "").trim().toLowerCase();
+  return products.some(p => (p.sku || "").trim().toLowerCase() === s);
+}
+
+function generateSkuFromName(name) {
+  const base = sanitizeSkuPart(name).slice(0, 12) || "PROD";
+  return `${base}-${randomBase36(4)}`;
+}
+
+function generateUniqueSku(name) {
+  let sku = generateSkuFromName(name);
+  let tries = 0;
+  while (skuExistsInBiz(sku) && tries < 25) {
+    sku = generateSkuFromName(name);
+    tries++;
+  }
+  return sku;
+}
+
+function setSkuAutoFromName() {
+  if (!pmSku || !pmName) return;
+  if (pmSkuManual?.checked) return; // solo si NO es manual
+  pmSku.value = generateUniqueSku(pmName.value);
+}
+
+// ===== Product modal actions =====
+function openNewProduct() {
+  clearPosMsg();
   if (!productModal) return setPosMsg("Falta el modal de producto en el HTML.", false);
 
-  hideError(prodError);
-  const p = products.find(x => x.id === id);
-  if (!p) return;
+  hideError(productModalError);
+  if (productModalTitle) productModalTitle.textContent = "Nuevo producto";
 
-  prodId.value = p.id;
-  prodName.value = p.name;
-  prodPrice.value = p.price;
-  prodStock.value = p.stock;
-  prodSku.value = p.sku || "";
+  if (pmName) pmName.value = "";
+  if (pmSku) pmSku.value = "";
+  if (pmCategory) pmCategory.value = "";
+  if (pmPrice) pmPrice.value = "";
+  if (pmStock) pmStock.value = "";
+  if (pmUnit) pmUnit.value = "";
+  if (pmTrackStock) pmTrackStock.checked = true;
 
-  if (productModalTitle) productModalTitle.textContent = "Editar producto";
+  // SKU por defecto automático
+  if (pmSkuManual) pmSkuManual.checked = false;
+  if (pmSku) {
+    pmSku.disabled = true;
+    pmSku.value = generateUniqueSku("");
+  }
+
   productModal.show();
 }
 
 function saveProductFromModal() {
-  hideError(prodError);
+  hideError(productModalError);
 
-  const id = (prodId?.value || "").trim();
-  const name = (prodName?.value || "").trim();
-  const price = Number(prodPrice?.value || 0);
-  const stock = Number(prodStock?.value || 0);
-  const sku = (prodSku?.value || "").trim();
+  const name = (pmName?.value || "").trim();
+  let sku = (pmSku?.value || "").trim(); // OJO: let, porque lo vamos a modificar
+  const category = (pmCategory?.value || "").trim();
+  const unit = (pmUnit?.value || "").trim();
+  const price = Number(pmPrice?.value || 0);
+  const stock = Number(pmStock?.value || 0);
+  const trackStock = pmTrackStock ? !!pmTrackStock.checked : true;
 
-  if (name.length < 2) return showError(prodError, "Nombre inválido.");
-  if (!(price >= 0)) return showError(prodError, "Precio inválido.");
-  if (!(stock >= 0)) return showError(prodError, "Stock inválido.");
+  if (name.length < 2) return showError(productModalError, "Nombre inválido.");
+  if (!Number.isFinite(price) || price < 0) return showError(productModalError, "Precio inválido.");
+  if (!Number.isFinite(stock) || stock < 0) return showError(productModalError, "Stock inválido.");
 
-  const all = getAllProducts();
-
-  if (!id) {
-    all.push({
-      id: crypto.randomUUID(),
-      businessId: ctx.biz.id,
-      name,
-      price,
-      stock,
-      sku,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
+  // ✅ SKU: si NO es manual, lo forzamos automático único
+  if (!pmSkuManual?.checked) {
+    sku = generateUniqueSku(name);
   } else {
-    const idx = all.findIndex(x => x.id === id && x.businessId === ctx.biz.id);
-    if (idx === -1) return showError(prodError, "No se encontró ese producto.");
-    all[idx] = { ...all[idx], name, price, stock, sku, updatedAt: new Date().toISOString() };
+    // manual: si puso algo, validamos duplicado
+    if (sku) {
+      const exists = products.some(p => (p.sku || "").toLowerCase() === sku.toLowerCase());
+      if (exists) return showError(productModalError, "Ese SKU ya existe.");
+    }
   }
 
+  const all = getAllProducts();
+  all.push({
+    id: crypto.randomUUID(),
+    bizId: ctx.biz.id,
+    name,
+    sku,
+    category,
+    unit,
+    price,
+    stock: Math.floor(stock),
+    trackStock,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
   saveAllProducts(all);
+
   products = getProductsByBiz(ctx.biz.id);
   renderProducts(productSearch?.value || "");
-  productModal?.hide();
+  productModal.hide();
 }
 
+// ===== Product delete =====
 function deleteProduct(id) {
   const p = products.find(x => x.id === id);
   if (!p) return;
 
-  const ok = confirm(`Eliminar "${p.name}"?`);
-  if (!ok) return;
+  if (!confirm(`Eliminar "${p.name}"?`)) return;
 
   cart = cart.filter(x => x.productId !== id);
 
-  const all = getAllProducts().filter(x => !(x.id === id && x.businessId === ctx.biz.id));
+  const all = getAllProducts().filter(x => !(x.id === id && x.bizId === ctx.biz.id));
   saveAllProducts(all);
 
   products = getProductsByBiz(ctx.biz.id);
@@ -352,17 +402,19 @@ function deleteProduct(id) {
   renderCart();
 }
 
-// ===== Actions: Cart =====
+// ===== Cart actions =====
 function addToCart(productId) {
   const p = products.find(x => x.id === productId);
   if (!p) return;
 
-  if (Number(p.stock) <= 0) return setPosMsg("No hay stock de ese producto.");
+  if (Number(p.stock) <= 0 && (p.trackStock ?? true)) return setPosMsg("No hay stock de ese producto.");
 
   const item = cart.find(x => x.productId === productId);
   const currentQty = item ? item.qty : 0;
 
-  if (currentQty + 1 > Number(p.stock)) return setPosMsg("No puedes agregar más, excede el stock.");
+  if ((p.trackStock ?? true) && currentQty + 1 > Number(p.stock)) {
+    return setPosMsg("No puedes agregar más, excede el stock.");
+  }
 
   clearPosMsg();
   if (!item) cart.push({ productId: p.id, name: p.name, price: p.price, qty: 1 });
@@ -378,7 +430,9 @@ function incCart(productId) {
   const p = products.find(x => x.id === productId);
   if (!p) return;
 
-  if (item.qty + 1 > Number(p.stock)) return setPosMsg("No puedes agregar más, excede el stock.");
+  if ((p.trackStock ?? true) && item.qty + 1 > Number(p.stock)) {
+    return setPosMsg("No puedes agregar más, excede el stock.");
+  }
 
   clearPosMsg();
   item.qty += 1;
@@ -410,7 +464,6 @@ function clearCart() {
 // ===== Checkout =====
 function checkout() {
   clearPosMsg();
-
   if (cart.length === 0) return setPosMsg("Carrito vacío.");
 
   const subtotal = cart.reduce((acc, it) => acc + (Number(it.price) * Number(it.qty)), 0);
@@ -419,19 +472,24 @@ function checkout() {
 
   if (total <= 0) return setPosMsg("El total debe ser mayor a 0.");
 
-  // validar stock
+  // validar stock (solo si trackStock)
   for (const it of cart) {
     const p = products.find(x => x.id === it.productId);
     if (!p) return setPosMsg("Un producto ya no existe.");
-    if (Number(it.qty) > Number(p.stock)) return setPosMsg(`Stock insuficiente: ${p.name}`);
+    if ((p.trackStock ?? true) && Number(it.qty) > Number(p.stock)) {
+      return setPosMsg(`Stock insuficiente: ${p.name}`);
+    }
   }
 
   // descontar stock
   const allProducts = getAllProducts();
   for (const it of cart) {
-    const idx = allProducts.findIndex(x => x.id === it.productId && x.businessId === ctx.biz.id);
+    const idx = allProducts.findIndex(x => x.id === it.productId && x.bizId === ctx.biz.id);
     if (idx !== -1) {
-      allProducts[idx].stock = Math.max(0, Number(allProducts[idx].stock) - Number(it.qty));
+      const track = allProducts[idx].trackStock ?? true;
+      if (track) {
+        allProducts[idx].stock = Math.max(0, Number(allProducts[idx].stock) - Number(it.qty));
+      }
       allProducts[idx].updatedAt = new Date().toISOString();
     }
   }
@@ -440,7 +498,7 @@ function checkout() {
   // registrar venta
   const sale = {
     id: crypto.randomUUID(),
-    businessId: ctx.biz.id,
+    bizId: ctx.biz.id,
     createdAt: new Date().toISOString(),
     items: cart.map(item => ({
       productId: item.productId,
@@ -474,58 +532,62 @@ function checkout() {
   setTimeout(() => clearPosMsg(), 1800);
 }
 
-// ===== Logout modal wiring (POS) =====
+// ===== Logout wiring =====
 function wireLogout() {
-  const btnLogout = document.getElementById("btnLogoutDash"); 
-  const btnLogoutMobile = document.getElementById("btnLogoutDashMobile"); 
-  const logoutModalEl = document.getElementById("logoutModal");
-  const confirmBtn = document.getElementById("confirmLogout");
+  if (!btnLogoutDash) return;
 
-  // Si no hay botón, no hacemos nada
-  if (!btnLogout && !btnLogoutMobile) return;
-
-  // Si no hay modal, fallback: confirm normal
-  if (!logoutModalEl || !window.bootstrap?.Modal) {
-    const fallback = () => {
+  if (!logoutModal) {
+    btnLogoutDash.addEventListener("click", () => {
       if (confirm("¿Seguro que deseas cerrar sesión?")) {
         clearSession();
         window.location.href = "Index.html";
       }
-    };
-    btnLogout?.addEventListener("click", fallback);
-    btnLogoutMobile?.addEventListener("click", fallback);
+    });
     return;
   }
 
-  const logoutModal = bootstrap.Modal.getOrCreateInstance(logoutModalEl);
+  btnLogoutDash.addEventListener("click", () => logoutModal.show());
 
-  btnLogout?.addEventListener("click", () => logoutModal.show());
-  btnLogoutMobile?.addEventListener("click", () => logoutModal.show());
-
-  confirmBtn?.addEventListener("click", () => {
+  confirmLogout?.addEventListener("click", () => {
     clearSession();
     window.location.href = "Index.html";
   });
 }
 
-// ===== Events wiring =====
+// ===== Events =====
 function wireEvents() {
-  // Productos
   btnOpenProductModal?.addEventListener("click", openNewProduct);
-  btnSaveProduct?.addEventListener("click", saveProductFromModal);
+  btnSaveProductModal?.addEventListener("click", saveProductFromModal);
 
   productSearch?.addEventListener("input", () => renderProducts(productSearch.value));
+
+  // ✅ listeners del SKU (van aquí, NO dentro de otros clicks)
+  pmName?.addEventListener("input", setSkuAutoFromName);
+
+  pmSkuManual?.addEventListener("change", () => {
+    const manual = !!pmSkuManual.checked;
+    if (pmSku) pmSku.disabled = !manual;
+
+    if (!manual) {
+      if (pmSku) pmSku.value = generateUniqueSku(pmName?.value || "");
+    } else {
+      pmSku?.focus();
+    }
+  });
+
+  btnGenSku?.addEventListener("click", () => {
+    if (!pmSku) return;
+    pmSku.value = generateUniqueSku(pmName?.value || "");
+  });
 
   productList?.addEventListener("click", (e) => {
     const btn = e.target.closest("button");
     if (!btn) return;
-
     const id = btn.getAttribute("data-id");
     const act = btn.getAttribute("data-act");
     if (!id || !act) return;
 
     if (act === "add") addToCart(id);
-    if (act === "edit") openEditProduct(id);
     if (act === "del") deleteProduct(id);
   });
 
@@ -559,11 +621,9 @@ function wireEvents() {
   });
 
   discountInput?.addEventListener("input", updateTotals);
-
   btnClearCart?.addEventListener("click", clearCart);
   btnCheckout?.addEventListener("click", checkout);
 
-  // Logout (modal)
   wireLogout();
 }
 

@@ -1,105 +1,62 @@
-// ====== Keys (mismas que tu app) ======
-const USERS_KEY = "pos_users";
+// ================================
+// Inventario.js (MVP PRO)
+// Conectado al POS por businessId + pos_products_v1
+// SKU único: Auto/Manual + regenerar
+// Innovación: "Bajo stock" + migración automática
+// ================================
+
 const SESSION_KEY = "pos_session";
+const USERS_KEY = "pos_users";
 const BUSINESSES_KEY = "pos_businesses";
-const SALES_KEY = "pos_sales_v1";
+const PRODUCTS_KEY = "pos_products_v1"; // MISMA KEY que POS usa
 
-// ====== Helpers base ======
-function getUsers() {
-  try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; } catch { return []; }
+// ===== Utils storage =====
+function jget(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+  catch { return fallback; }
 }
-function getSession() {
-  try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; }
-}
-function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
-}
-function getBusinesses() {
-  try { return JSON.parse(localStorage.getItem(BUSINESSES_KEY)) || []; } catch { return []; }
-}
-function getBusinessByOwner(userId) {
-  return getBusinesses().find(b => b.ownerUserId === userId) || null;
-}
+function jset(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
 
-// ====== Auth guard ======
-function requireAuthAndBizOrRedirect() {
-  const session = getSession();
-  if (!session?.userId) {
-    window.location.href = "Index.html";
-    return null;
-  }
+function getSession() { return jget(SESSION_KEY, null); }
+function clearSession() { localStorage.removeItem(SESSION_KEY); }
+function getUsers() { return jget(USERS_KEY, []); }
+function getBusinesses() { return jget(BUSINESSES_KEY, []); }
 
-  const user = getUsers().find(u => u.id === session.userId);
-  if (!user) {
-    clearSession();
-    window.location.href = "Index.html";
-    return null;
-  }
+function getAllProducts() { return jget(PRODUCTS_KEY, []); }
+function saveAllProducts(all) { jset(PRODUCTS_KEY, all); }
 
-  const biz = getBusinessByOwner(session.userId);
-  if (!biz) {
-    window.location.href = "Index.html";
-    return null;
-  }
+// ===== Auth / business =====
+function requireBizOrRedirect() {
+  const s = getSession();
+  if (!s?.userId) { window.location.href = "Index.html"; return null; }
 
-  return { user, biz };
+  const u = getUsers().find(x => x.id === s.userId);
+  if (!u) { clearSession(); window.location.href = "Index.html"; return null; }
+
+  const biz = getBusinesses().find(b => b.ownerUserId === s.userId);
+  if (!biz) { window.location.href = "Index.html"; return null; }
+
+  return { user: u, biz };
 }
 
-// ====== Products storage (por empresa) ======
-function getAllProducts() {
-  try { return JSON.parse(localStorage.getItem(PRODUCTS_KEY)) || []; } catch { return []; }
-}
-function saveAllProducts(all) {
-  localStorage.setItem(PRODUCTS_KEY, JSON.stringify(all));
-}
-function getProductsForBiz(bizId) {
-  return getAllProducts().filter(p => p.bizId === bizId);
-}
-function upsertProduct(product) {
-  const all = getAllProducts();
-  const idx = all.findIndex(p => p.id === product.id);
-  if (idx >= 0) all[idx] = product;
-  else all.push(product);
-  saveAllProducts(all);
-}
-function deleteProduct(productId) {
-  const all = getAllProducts().filter(p => p.id !== productId);
-  saveAllProducts(all);
-}
-function deleteAllForBiz(bizId) {
-  const all = getAllProducts().filter(p => p.bizId !== bizId);
-  saveAllProducts(all);
-}
-
-// ====== UI helpers ======
+// ===== Formatting =====
 function money(n) {
-  const v = Number(n || 0);
-  return v.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+  return Number(n || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 }
-function showError(el, msg) {
-  el.textContent = msg;
-  el.classList.remove("d-none");
-}
-function hideError(el) {
-  el.textContent = "";
-  el.classList.add("d-none");
-}
-function safeText(s) {
-  return String(s ?? "");
+function clampNumber(n, min, max) {
+  const x = Number(n);
+  if (Number.isNaN(x)) return min;
+  return Math.min(max, Math.max(min, x));
 }
 
-// ====== DOM ======
+// ===== DOM =====
 const bizMini = document.getElementById("bizMini");
+
 const searchInput = document.getElementById("searchInput");
-const countLabel = document.getElementById("countLabel");
-const tbody = document.getElementById("productsTbody");
-const emptyState = document.getElementById("emptyState");
+const btnLogoutInv = document.getElementById("btnLogoutInv");
 
 const formTitle = document.getElementById("formTitle");
 const formError = document.getElementById("formError");
-const btnResetForm = document.getElementById("btnResetForm");
-const btnSaveProduct = document.getElementById("btnSaveProduct");
-const btnDeleteProduct = document.getElementById("btnDeleteProduct");
 
 const pName = document.getElementById("pName");
 const pSku = document.getElementById("pSku");
@@ -108,206 +65,407 @@ const pPrice = document.getElementById("pPrice");
 const pStock = document.getElementById("pStock");
 const pUnit = document.getElementById("pUnit");
 
+const skuManual = document.getElementById("skuManual");
+const btnGenSku = document.getElementById("btnGenSku");
+
+const btnSaveProduct = document.getElementById("btnSaveProduct");
+const btnDeleteProduct = document.getElementById("btnDeleteProduct");
+const btnResetForm = document.getElementById("btnResetForm");
+
 const btnSeedDemo = document.getElementById("btnSeedDemo");
 const btnClearAll = document.getElementById("btnClearAll");
-const btnLogoutInv = document.getElementById("btnLogoutInv");
 
-// ====== State ======
-let ctx = null; // {user, biz}
-let editingId = null;
-let currentList = [];
+const productsTbody = document.getElementById("productsTbody");
+const countLabel = document.getElementById("countLabel");
+const emptyState = document.getElementById("emptyState");
 
-// ====== Render ======
-function renderTable(list) {
-  tbody.innerHTML = list.map(p => `
-    <tr>
-      <td>
-        <div class="fw-semibold">${safeText(p.name)}</div>
-        <div class="text-secondary small">${safeText(p.unit || "")}</div>
-      </td>
-      <td class="text-secondary">${safeText(p.sku || "")}</td>
-      <td class="text-secondary">${safeText(p.category || "")}</td>
-      <td class="text-end">${money(p.price)}</td>
-      <td class="text-end">${Number(p.stock || 0)}</td>
-      <td class="text-end">
-        <button class="btn btn-outline-light btn-sm" data-edit="${p.id}">Editar</button>
-      </td>
-    </tr>
-  `).join("");
+// ===== State =====
+let ctx = null;             // { user, biz }
+let editingId = null;       // producto actual en edición (id)
+let currentQuery = "";      // búsqueda
+const LOW_STOCK = 5;        // umbral de stock bajo (innovación)
 
-  const count = list.length;
-  countLabel.textContent = `${count} producto${count === 1 ? "" : "s"}`;
+// ===== MIGRACIÓN: bizId -> businessId (por si guardaste antes) =====
+function migrateBizIdToBusinessId() {
+  const all = getAllProducts();
+  let changed = false;
 
-  emptyState.classList.toggle("d-none", count !== 0);
+  for (const p of all) {
+    if (p && p.bizId && !p.businessId) {
+      p.businessId = p.bizId;
+      delete p.bizId;
+      changed = true;
+    }
+  }
+  if (changed) saveAllProducts(all);
+}
 
-  // bind edit
-  tbody.querySelectorAll("[data-edit]").forEach(btn => {
+// ===== Data helpers =====
+function getProductsForBiz(businessId) {
+  return getAllProducts().filter(p => p.businessId === businessId);
+}
+
+function upsertProduct(product) {
+  const all = getAllProducts();
+  const i = all.findIndex(p => p.id === product.id);
+  if (i >= 0) all[i] = product;
+  else all.push(product);
+  saveAllProducts(all);
+}
+
+function removeProduct(productId) {
+  const all = getAllProducts();
+  const next = all.filter(p => p.id !== productId);
+  saveAllProducts(next);
+}
+
+function clearProductsForBiz(businessId) {
+  const all = getAllProducts();
+  const next = all.filter(p => p.businessId !== businessId);
+  saveAllProducts(next);
+}
+
+// ===== SKU generation =====
+function normalizeSkuBase(s) {
+  return String(s || "")
+    .toUpperCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 18);
+}
+
+function generateSku({ name, category }, businessId, excludeId = null) {
+  const baseRaw = `${name || "PROD"}-${category || "GEN"}`;
+  const base = normalizeSkuBase(baseRaw) || "PROD-GEN";
+
+  const existing = getProductsForBiz(businessId)
+    .filter(p => p.id !== excludeId)
+    .map(p => String(p.sku || "").toUpperCase());
+
+  if (!existing.includes(base)) return base;
+
+  let n = 2;
+  while (n < 1000) {
+    const candidate = `${base}-${String(n).padStart(2, "0")}`;
+    if (!existing.includes(candidate)) return candidate;
+    n++;
+  }
+  return `${base}-${Date.now().toString().slice(-4)}`;
+}
+
+function setSkuModeManual(isManual) {
+  if (!pSku) return;
+  pSku.disabled = !isManual;
+  pSku.placeholder = isManual ? "Escribe el SKU..." : "SKU automático";
+
+  if (!isManual && ctx) {
+    // al pasar a auto, genera
+    pSku.value = generateSku(
+      { name: pName?.value, category: pCategory?.value },
+      ctx.biz.id,
+      editingId
+    );
+  }
+}
+
+function refreshAutoSkuIfNeeded() {
+  if (!ctx || !pSku || !skuManual) return;
+  if (!skuManual.checked) {
+    pSku.value = generateSku(
+      { name: pName?.value, category: pCategory?.value },
+      ctx.biz.id,
+      editingId
+    );
+  }
+}
+
+// ===== UI helpers =====
+function showFormError(msg) {
+  if (!formError) return;
+  formError.textContent = msg;
+  formError.classList.remove("d-none");
+}
+function hideFormError() {
+  if (!formError) return;
+  formError.textContent = "";
+  formError.classList.add("d-none");
+}
+
+function resetForm() {
+  editingId = null;
+  hideFormError();
+
+  if (formTitle) formTitle.textContent = "Agregar producto";
+
+  if (pName) pName.value = "";
+  if (pCategory) pCategory.value = "";
+  if (pPrice) pPrice.value = "";
+  if (pStock) pStock.value = "";
+  if (pUnit) pUnit.value = "";
+
+  // SKU vuelve a auto por defecto
+  if (skuManual) skuManual.checked = false;
+  setSkuModeManual(false);
+
+  // genera SKU "placeholder" (si hay ctx)
+  if (ctx && pSku) {
+    pSku.value = generateSku({ name: "", category: "" }, ctx.biz.id, null);
+  }
+
+  if (btnDeleteProduct) btnDeleteProduct.classList.add("d-none");
+}
+
+function loadForm(product) {
+  editingId = product.id;
+  hideFormError();
+
+  if (formTitle) formTitle.textContent = "Editar producto";
+  if (pName) pName.value = product.name || "";
+  if (pCategory) pCategory.value = product.category || "";
+  if (pPrice) pPrice.value = String(product.price ?? "");
+  if (pStock) pStock.value = String(product.stock ?? "");
+  if (pUnit) pUnit.value = product.unit || "";
+
+  // SKU: por defecto manual OFF (auto), pero si ya existe SKU, lo mostramos
+  if (pSku) pSku.value = product.sku || "";
+  if (skuManual) skuManual.checked = true; // al editar, lo dejamos manual para que no te lo cambie solo
+  setSkuModeManual(true);
+
+  if (btnDeleteProduct) btnDeleteProduct.classList.remove("d-none");
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, m => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+  }[m]));
+}
+
+function renderList() {
+  if (!ctx || !productsTbody) return;
+
+  const all = getProductsForBiz(ctx.biz.id);
+
+  // búsqueda
+  const q = String(currentQuery || "").trim().toLowerCase();
+  const filtered = !q ? all : all.filter(p => {
+    const name = String(p.name || "").toLowerCase();
+    const sku = String(p.sku || "").toLowerCase();
+    return name.includes(q) || sku.includes(q);
+  });
+
+  // contador / empty
+  if (countLabel) countLabel.textContent = `${filtered.length} producto(s)`;
+  if (emptyState) emptyState.classList.toggle("d-none", filtered.length !== 0);
+
+  // ordenar (innovación simple): bajo stock arriba, luego alfabético
+  filtered.sort((a, b) => {
+    const alow = Number(a.stock ?? 0) <= LOW_STOCK ? 0 : 1;
+    const blow = Number(b.stock ?? 0) <= LOW_STOCK ? 0 : 1;
+    if (alow !== blow) return alow - blow;
+    return String(a.name || "").localeCompare(String(b.name || ""), "es");
+  });
+
+  productsTbody.innerHTML = filtered.map(p => {
+    const low = Number(p.stock ?? 0) <= LOW_STOCK;
+    const badge = low ? `<span class="badge bg-warning text-dark ms-2">Bajo stock</span>` : "";
+
+    return `
+      <tr>
+        <td>
+          <div class="fw-semibold">${escapeHtml(p.name)}${badge}</div>
+          <div class="text-secondary small">${escapeHtml(p.category || "—")}</div>
+        </td>
+        <td class="text-secondary">${escapeHtml(p.sku || "—")}</td>
+        <td class="text-secondary">${escapeHtml(p.unit || "—")}</td>
+        <td class="text-end">${money(p.price)}</td>
+        <td class="text-end">${Number(p.stock ?? 0)}</td>
+        <td class="text-end">
+          <button class="btn btn-outline-light btn-sm" data-edit="${p.id}">Editar</button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  // wire edit buttons
+  productsTbody.querySelectorAll("[data-edit]").forEach(btn => {
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-edit");
-      const item = currentList.find(x => x.id === id);
-      if (item) loadIntoForm(item);
+      const prod = getProductsForBiz(ctx.biz.id).find(x => x.id === id);
+      if (!prod) return;
+      loadForm(prod);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
   });
 }
 
-function refresh() {
-  const q = (searchInput.value || "").trim().toLowerCase();
-  const list = getProductsForBiz(ctx.biz.id);
+// ===== Validation =====
+function validateProductInput() {
+  const name = (pName?.value || "").trim();
+  const category = (pCategory?.value || "").trim();
+  const unit = (pUnit?.value || "").trim();
 
-  currentList = q
-    ? list.filter(p =>
-        (p.name || "").toLowerCase().includes(q) ||
-        (p.sku || "").toLowerCase().includes(q)
-      )
-    : list;
+  const price = clampNumber(pPrice?.value, 0, 1e9);
+  const stock = Math.floor(clampNumber(pStock?.value, 0, 1e9));
 
-  renderTable(currentList);
-}
-
-// ====== Form ======
-function resetForm() {
-  editingId = null;
-  formTitle.textContent = "Agregar producto";
-  btnDeleteProduct.classList.add("d-none");
-  btnSaveProduct.textContent = "Guardar";
-
-  pName.value = "";
-  pSku.value = "";
-  pCategory.value = "";
-  pPrice.value = "";
-  pStock.value = "";
-  pUnit.value = "";
-
-  hideError(formError);
-}
-
-function loadIntoForm(p) {
-  editingId = p.id;
-  formTitle.textContent = "Editar producto";
-  btnDeleteProduct.classList.remove("d-none");
-  btnSaveProduct.textContent = "Actualizar";
-
-  pName.value = p.name || "";
-  pSku.value = p.sku || "";
-  pCategory.value = p.category || "";
-  pPrice.value = p.price ?? "";
-  pStock.value = p.stock ?? "";
-  pUnit.value = p.unit || "";
-
-  hideError(formError);
-}
-
-function validateForm() {
-  const name = (pName.value || "").trim();
-  const sku = (pSku.value || "").trim();
-  const category = (pCategory.value || "").trim();
-  const unit = (pUnit.value || "").trim();
-
-  const price = Number(pPrice.value);
-  const stock = Number(pStock.value);
-
-  if (name.length < 2) return { ok: false, msg: "Pon un nombre de producto (mínimo 2 letras)." };
-  if (!Number.isFinite(price) || price < 0) return { ok: false, msg: "Precio inválido." };
+  if (name.length < 2) return { ok: false, msg: "Pon un nombre válido (mínimo 2 letras)." };
+  if (!Number.isFinite(price) || price <= 0) return { ok: false, msg: "Precio inválido." };
   if (!Number.isFinite(stock) || stock < 0) return { ok: false, msg: "Stock inválido." };
 
-  return { ok: true, data: { name, sku, category, unit, price, stock } };
-}
+  // SKU
+  let sku = (pSku?.value || "").trim();
 
-// ====== Events ======
-btnResetForm.addEventListener("click", resetForm);
-
-btnSaveProduct.addEventListener("click", () => {
-  hideError(formError);
-  const v = validateForm();
-  if (!v.ok) return showError(formError, v.msg);
-
-  const now = new Date().toISOString();
-  const base = v.data;
-
-  // si SKU existe dentro de la misma empresa, evita duplicados (opcional pero útil)
-  const skuLower = (base.sku || "").toLowerCase();
-  if (skuLower) {
-    const existing = getProductsForBiz(ctx.biz.id).find(p => (p.sku || "").toLowerCase() === skuLower);
-    if (existing && existing.id !== editingId) {
-      return showError(formError, "Ese SKU ya existe en tu inventario.");
+  if (!skuManual?.checked) {
+    // auto: generar siempre (para garantizar unicidad)
+    sku = generateSku({ name, category }, ctx.biz.id, editingId);
+    if (pSku) pSku.value = sku;
+  } else {
+    // manual: si lo deja vacío, lo generamos
+    if (!sku) {
+      sku = generateSku({ name, category }, ctx.biz.id, editingId);
+      if (pSku) pSku.value = sku;
     }
   }
 
-  const product = {
-    id: editingId || crypto.randomUUID(),
-    bizId: ctx.biz.id,
-    name: base.name,
-    sku: base.sku,
-    category: base.category,
-    unit: base.unit,
-    price: base.price,
-    stock: Math.floor(base.stock),
-    updatedAt: now,
-    createdAt: editingId ? (getProductsForBiz(ctx.biz.id).find(p => p.id === editingId)?.createdAt || now) : now
+  // unicidad SKU dentro de la empresa
+  const exists = getProductsForBiz(ctx.biz.id)
+    .some(p => p.id !== editingId && String(p.sku || "").toUpperCase() === sku.toUpperCase());
+
+  if (exists) return { ok: false, msg: "Ese SKU ya existe. Regenera (↻) o cambia a manual y escribe otro." };
+
+  return {
+    ok: true,
+    value: { name, sku, category, unit, price, stock }
   };
+}
 
-  upsertProduct(product);
-  resetForm();
-  refresh();
-});
+// ===== Events =====
+function wireEvents() {
+  // logout simple (luego lo haces con modal)
+  btnLogoutInv?.addEventListener("click", () => {
+    clearSession();
+    window.location.href = "Index.html";
+  });
 
-btnDeleteProduct.addEventListener("click", () => {
-  if (!editingId) return;
-  const ok = confirm("¿Eliminar este producto?");
-  if (!ok) return;
+  // buscar
+  searchInput?.addEventListener("input", (e) => {
+    currentQuery = e.target.value || "";
+    renderList();
+  });
 
-  deleteProduct(editingId);
-  resetForm();
-  refresh();
-});
+  // SKU events
+  skuManual?.addEventListener("change", (e) => setSkuModeManual(e.target.checked));
+  btnGenSku?.addEventListener("click", () => {
+    if (!ctx || !pSku) return;
+    if (skuManual?.checked) return;
+    pSku.value = generateSku({ name: pName?.value, category: pCategory?.value }, ctx.biz.id, editingId);
+  });
 
-searchInput.addEventListener("input", refresh);
+  pName?.addEventListener("input", refreshAutoSkuIfNeeded);
+  pCategory?.addEventListener("input", refreshAutoSkuIfNeeded);
 
-btnSeedDemo.addEventListener("click", () => {
-  const list = getProductsForBiz(ctx.biz.id);
-  if (list.length > 0) {
-    const ok = confirm("Ya tienes productos. ¿Quieres agregar demo de todos modos?");
-    if (!ok) return;
-  }
+  // reset
+  btnResetForm?.addEventListener("click", () => resetForm());
 
-  const now = new Date().toISOString();
-  const demo = [
-    { name: "Coca 600ml", sku: "COCA-600", category: "Bebidas", unit: "pieza", price: 22, stock: 30 },
-    { name: "Agua 1L", sku: "AGUA-1L", category: "Bebidas", unit: "pieza", price: 15, stock: 40 },
-    { name: "Papas clásicas", sku: "PAP-CL", category: "Snacks", unit: "pieza", price: 18, stock: 25 },
-    { name: "Chocolate", sku: "CHO-01", category: "Dulces", unit: "pieza", price: 20, stock: 12 },
-  ].map(x => ({
-    id: crypto.randomUUID(),
-    bizId: ctx.biz.id,
-    ...x,
-    createdAt: now,
-    updatedAt: now
-  }));
+  // save
+  btnSaveProduct?.addEventListener("click", () => {
+    hideFormError();
+    if (!ctx) return;
 
-  demo.forEach(upsertProduct);
-  refresh();
-});
+    const v = validateProductInput();
+    if (!v.ok) return showFormError(v.msg);
 
-btnClearAll.addEventListener("click", () => {
-  const ok = confirm("¿Borrar TODOS los productos de esta empresa? Esta acción no se puede deshacer.");
-  if (!ok) return;
+    const now = new Date().toISOString();
 
-  deleteAllForBiz(ctx.biz.id);
-  resetForm();
-  refresh();
-});
+    const existing = editingId ? getProductsForBiz(ctx.biz.id).find(p => p.id === editingId) : null;
 
-btnLogoutInv.addEventListener("click", () => {
-  clearSession();
-  window.location.href = "Index.html";
-});
+    const product = {
+      id: editingId || crypto.randomUUID(),
+      businessId: ctx.biz.id, // ✅ CLAVE para conectar con POS
+      name: v.value.name,
+      sku: v.value.sku,
+      category: v.value.category,
+      unit: v.value.unit,
+      price: v.value.price,
+      stock: v.value.stock,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now
+    };
 
-// ====== INIT ======
+    upsertProduct(product);
+    resetForm();
+    renderList();
+  });
+
+  // delete
+  btnDeleteProduct?.addEventListener("click", () => {
+    if (!ctx || !editingId) return;
+    const prod = getProductsForBiz(ctx.biz.id).find(p => p.id === editingId);
+    if (!prod) return;
+
+    if (!confirm(`¿Eliminar "${prod.name}"?`)) return;
+
+    removeProduct(editingId);
+    resetForm();
+    renderList();
+  });
+
+  // demo
+  btnSeedDemo?.addEventListener("click", () => {
+    if (!ctx) return;
+
+    const demo = [
+      { name: "Coca 600ml", category: "Bebidas", unit: "pieza", price: 20, stock: 24 },
+      { name: "Sabritas", category: "Botanas", unit: "pieza", price: 18, stock: 8 },
+      { name: "Agua 1L", category: "Bebidas", unit: "pieza", price: 15, stock: 4 }, // bajo stock
+      { name: "Pan Blanco", category: "Panadería", unit: "pieza", price: 35, stock: 12 }
+    ];
+
+    for (const d of demo) {
+      const sku = generateSku({ name: d.name, category: d.category }, ctx.biz.id, null);
+      upsertProduct({
+        id: crypto.randomUUID(),
+        businessId: ctx.biz.id,
+        name: d.name,
+        sku,
+        category: d.category,
+        unit: d.unit,
+        price: d.price,
+        stock: d.stock,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    renderList();
+  });
+
+  // borrar todo empresa
+  btnClearAll?.addEventListener("click", () => {
+    if (!ctx) return;
+    if (!confirm("¿Borrar todos los productos de esta empresa?")) return;
+
+    clearProductsForBiz(ctx.biz.id);
+    resetForm();
+    renderList();
+  });
+}
+
+// ===== INIT =====
 (function init() {
-  ctx = requireAuthAndBizOrRedirect();
+  ctx = requireBizOrRedirect();
   if (!ctx) return;
 
-  bizMini.textContent = `${ctx.biz.name} — @${ctx.biz.handle}`;
+  // migra estructuras viejas
+  migrateBizIdToBusinessId();
+
+  // header
+  if (bizMini) bizMini.textContent = `${ctx.biz.name} — @${ctx.biz.handle}`;
+
+  // estado inicial SKU
   resetForm();
-  refresh();
+
+  // events + render
+  wireEvents();
+  renderList();
 })();
