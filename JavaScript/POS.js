@@ -1,9 +1,13 @@
+/* =========================
+   POS.js (LIMPIO / SIN DUPLICADOS)
+   Keys reales:
+   PRODUCTS_KEY = "pos_products_v1"
+   SALES_KEY    = "pos_sales_v1"
+   ========================= */
 
 const USERS_KEY = "pos_users";
 const SESSION_KEY = "pos_session";
 const BUSINESSES_KEY = "pos_businesses";
-
-// ✅ MISMO KEY que Inventario.js
 const PRODUCTS_KEY = "pos_products_v1";
 const SALES_KEY = "pos_sales_v1";
 
@@ -35,7 +39,7 @@ function requireAuth() {
   return { user, biz };
 }
 
-// Backward compatible: si antes guardaste businessId / bizId mezclado
+// Backward compatible (bizId/businessId)
 function normalizeProduct(p) {
   if (!p) return p;
   if (!p.bizId && p.businessId) p.bizId = p.businessId;
@@ -62,16 +66,45 @@ function money(n) {
   const x = Number(n || 0);
   return x.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 }
-function isToday(isoString) {
-  const d = new Date(isoString);
-  const now = new Date();
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-}
 function escapeHtml(s) {
   return String(s ?? "")
     .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;").replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+function toMs(value) {
+  if (value == null) return null;
+  if (typeof value === "number") return value;
+  if (value instanceof Date) return value.getTime();
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? null : ms;
+}
+function startOfDayMs(ms) {
+  const d = new Date(ms);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+function relativeDayLabelFromValue(value) {
+  const ms = toMs(value);
+  if (!ms) return "—";
+  const now = Date.now();
+  const diffDays = Math.round((startOfDayMs(ms) - startOfDayMs(now)) / 86400000);
+  if (diffDays === 0) return "hoy";
+  if (diffDays === -1) return "ayer";
+  if (diffDays === -2) return "antier";
+  const rtf = new Intl.RelativeTimeFormat("es", { numeric: "auto" });
+  return rtf.format(diffDays, "day"); // "hace 7 días"
+}
+function isToday(value) {
+  const ms = toMs(value);
+  if (!ms) return false;
+  const d = new Date(ms);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
+function setText(id, txt) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = txt;
 }
 
 // ---------- State ----------
@@ -118,7 +151,6 @@ const pmStock = document.getElementById("pmStock");
 const pmUnit = document.getElementById("pmUnit");
 const pmTrackStock = document.getElementById("pmTrackStock");
 
-// SKU UI
 const pmSkuManual = document.getElementById("pmSkuManual");
 const btnGenSku = document.getElementById("btnGenSku");
 
@@ -227,38 +259,50 @@ function renderCart() {
 
 function renderTodayTotal() {
   if (!todayTotalChip) return;
-  const totalToday = sales.filter(s => isToday(s.createdAt)).reduce((acc, s) => acc + Number(s.total || 0), 0);
+  const totalToday = sales
+    .filter(s => isToday(s.createdAt))
+    .reduce((acc, s) => acc + Number(s.total || 0), 0);
+
   todayTotalChip.textContent = `${money(totalToday)} hoy`;
 }
 
 function saleItemsPreview(items = []) {
-  // resumen tipo: "Coca x2, Pan x1"
   const max = 2;
   const parts = items.slice(0, max).map(it => `${it.name || "Producto"} x${Number(it.qty || 1)}`);
   const rest = items.length - max;
   return parts.join(", ") + (rest > 0 ? ` +${rest} más` : "");
 }
 
+/* ==========
+   Ventas recientes (sin bug)
+   - chip: hoy/ayer/antier/hace X días ✅
+   - orden por fecha real ✅
+   - desglose opcional ✅ (si existen ids)
+   ========== */
 function renderSales() {
   if (!salesList) return;
 
-  const recent = [...sales]
-    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
-    .slice(0, 8);
+  const sorted = [...sales].sort((a, b) => (toMs(b.createdAt) || 0) - (toMs(a.createdAt) || 0));
+  const recent = sorted.slice(0, 8);
 
   if (recent.length === 0) {
     salesList.innerHTML = `<div class="muted">Aún no hay ventas.</div>`;
     renderTodayTotal();
+    renderSalesBreakdown(sorted);
     return;
   }
 
   salesList.innerHTML = recent.map(s => {
-    const when = new Date(s.createdAt);
+    const whenMs = toMs(s.createdAt);
+    const when = whenMs ? new Date(whenMs) : new Date();
     const hh = String(when.getHours()).padStart(2, "0");
     const mm = String(when.getMinutes()).padStart(2, "0");
-    const items = s.items || [];
+
+    const items = Array.isArray(s.items) ? s.items : [];
     const itemsCount = items.reduce((a, x) => a + Number(x.qty || 0), 0);
-    const collapseId = `sale_${s.id.replaceAll("-", "")}`;
+
+    const collapseId = `sale_${String(s.id || "").replaceAll("-", "") || Math.random().toString(16).slice(2)}`;
+    const dayLabel = relativeDayLabelFromValue(s.createdAt);
 
     return `
       <div class="item">
@@ -292,7 +336,7 @@ function renderSales() {
         </div>
 
         <div class="d-flex flex-column align-items-end gap-2">
-          <span class="chip">${isToday(s.createdAt) ? "Hoy" : "—"}</span>
+          <span class="chip">${dayLabel}</span>
           <button class="btn btn-soft btn-sm"
             type="button"
             data-bs-toggle="collapse"
@@ -305,8 +349,62 @@ function renderSales() {
   }).join("");
 
   renderTodayTotal();
+  renderSalesBreakdown(sorted);
 }
 
+/* ==========
+   Desglose (opcional)
+   Si tu HTML tiene estos IDs:
+   - sumIngresosHoy, sumTicketsHoy, sumUltimaVenta, sumArticulosHoy, salesTodayList
+   Se llena; si no, no pasa nada.
+   ========== */
+function renderSalesBreakdown(sortedSales) {
+  const now = Date.now();
+  const today0 = startOfDayMs(now);
+
+  const todaySales = sortedSales.filter(s => (toMs(s.createdAt) || 0) >= today0);
+
+  const ingresosHoy = todaySales.reduce((acc, s) => acc + Number(s.total || 0), 0);
+  const ticketsHoy = todaySales.length;
+  const articulosHoy = todaySales.reduce((acc, s) => {
+    const items = Array.isArray(s.items) ? s.items : [];
+    return acc + items.reduce((a, it) => a + Number(it.qty || 0), 0);
+  }, 0);
+  const ultimaMs = todaySales[0] ? toMs(todaySales[0].createdAt) : null;
+
+  setText("sumIngresosHoy", money(ingresosHoy));
+  setText("sumTicketsHoy", ticketsHoy ? String(ticketsHoy) : "—");
+  setText("sumArticulosHoy", articulosHoy ? String(articulosHoy) : "—");
+  setText("sumUltimaVenta", ultimaMs
+    ? new Date(ultimaMs).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })
+    : "—"
+  );
+
+  const todayList = document.getElementById("salesTodayList");
+  if (!todayList) return;
+
+  if (!todaySales.length) {
+    todayList.innerHTML = `<div class="muted">Hoy no hay ventas todavía.</div>`;
+    return;
+  }
+
+  todayList.innerHTML = todaySales.slice(0, 20).map(s => {
+    const ms = toMs(s.createdAt);
+    const t = ms ? new Date(ms).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }) : "--:--";
+    const itemsCount = (s.items || []).reduce((a, x) => a + Number(x.qty || 0), 0);
+    return `
+      <div class="item">
+        <div>
+          <div class="item-title">Venta <span class="muted tiny">• ${t}</span></div>
+          <div class="item-sub">${itemsCount} artículos • ${escapeHtml(s.method || "Efectivo")}</div>
+        </div>
+        <div class="fw-semibold">${money(s.total)}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+// ---------- Totals ----------
 function updateTotals() {
   const subtotal = cart.reduce((acc, it) => acc + (Number(it.price) * Number(it.qty)), 0);
   const discount = Math.max(0, Number(discountInput?.value || 0));
@@ -363,7 +461,6 @@ function openNewProduct() {
   pmUnit.value = "";
   if (pmTrackStock) pmTrackStock.checked = true;
 
-  // SKU automático por defecto
   if (pmSkuManual) pmSkuManual.checked = false;
   if (pmSku) {
     pmSku.disabled = true;
@@ -387,7 +484,6 @@ function saveProductFromModal() {
   if (!Number.isFinite(price) || price < 0) return showError(productModalError, "Precio inválido.");
   if (!Number.isFinite(stock) || stock < 0) return showError(productModalError, "Stock inválido.");
 
-  // SKU: si no es manual => siempre auto único
   if (!pmSkuManual?.checked) {
     sku = generateUniqueSku(name);
   } else {
@@ -471,7 +567,8 @@ function decCart(productId) {
 
   clearPosMsg();
   item.qty -= 1;
-  if (item.qty <= 0) cart = cart.filter(x => x.productId !== productId);
+  if (item.qty <= 0) cart = cart.filter(x => x.productId === productId ? false : true);
+  cart = cart.filter(x => x.qty > 0);
   renderCart();
 }
 function removeFromCart(productId) {
@@ -496,7 +593,7 @@ function checkout() {
 
   if (total <= 0) return setPosMsg("El total debe ser mayor a 0.");
 
-  // validar stock (solo si trackStock)
+  // validar stock
   for (const it of cart) {
     const p = products.find(x => x.id === it.productId);
     if (!p) return setPosMsg("Un producto ya no existe.");
@@ -515,7 +612,7 @@ function checkout() {
   }
   saveAllProducts(allProducts);
 
-  // registrar venta (con NOMBRES dentro de items)
+  // registrar venta
   const sale = {
     id: crypto.randomUUID(),
     bizId: ctx.biz.id,
@@ -536,7 +633,7 @@ function checkout() {
   allSales.push(sale);
   saveAllSales(allSales);
 
-  // refrescar
+  // refrescar state
   products = getProductsByBiz(ctx.biz.id);
   sales = getSalesByBiz(ctx.biz.id);
 
@@ -579,7 +676,6 @@ function wireEvents() {
 
   productSearch?.addEventListener("input", () => renderProducts(productSearch.value));
 
-  // SKU
   pmName?.addEventListener("input", setSkuAutoFromName);
 
   pmSkuManual?.addEventListener("change", () => {
@@ -598,7 +694,6 @@ function wireEvents() {
     pmSku.value = generateUniqueSku(pmName?.value || "");
   });
 
-  // lista productos
   productList?.addEventListener("click", (e) => {
     const btn = e.target.closest("button");
     if (!btn) return;
@@ -610,7 +705,6 @@ function wireEvents() {
     if (act === "del") deleteProduct(id);
   });
 
-  // buscar y agregar (Enter)
   posSearch?.addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
     const q = (posSearch.value || "").trim().toLowerCase();
@@ -625,7 +719,6 @@ function wireEvents() {
     posSearch.value = "";
   });
 
-  // carrito
   cartList?.addEventListener("click", (e) => {
     const btn = e.target.closest("button");
     if (!btn) return;
@@ -652,7 +745,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   renderBiz();
 
-  // ✅ aquí se cargan productos creados en Inventario
   products = getProductsByBiz(ctx.biz.id);
   sales = getSalesByBiz(ctx.biz.id);
 
@@ -662,3 +754,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
   wireEvents();
 });
+
+document.addEventListener("DOMContentLoaded", () => {
+  const collapseEl = document.getElementById("salesBreakdown");
+  const recentWrap = document.getElementById("salesRecentWrap");
+  const hint = document.getElementById("salesHint");
+  const btn = document.getElementById("btnSalesToggle");
+
+  if (!collapseEl || !recentWrap) return;
+
+  collapseEl.addEventListener("show.bs.collapse", () => {
+    recentWrap.classList.add("d-none");
+    if (hint) hint.textContent = "Vista detallada";
+    if (btn) btn.innerHTML = `<i class="bi bi-chevron-up me-1"></i> Ocultar`;
+  });
+
+  collapseEl.addEventListener("hide.bs.collapse", () => {
+    recentWrap.classList.remove("d-none");
+    if (hint) hint.textContent = "Últimas ventas registradas";
+    if (btn) btn.innerHTML = `<i class="bi bi-list-ul me-1"></i> Desglose`;
+  });
+});
+

@@ -11,6 +11,14 @@
 
   --shadow: 0 18px 60px rgba(0,0,0,.55);
   --radius: 22px;
+
+  --modalBg: rgba(20,22,30,.92);
+  --modalBorder: var(--stroke);
+  --modalTxt: var(--txt);
+  --closeInvert: 1;
+
+  --backdropA: rgba(13,110,253,.18);
+  --backdropB: rgba(0,0,0,.85);
 }
 
 /* fondo tipo “aurora” */
@@ -24,8 +32,9 @@
     linear-gradient(180deg, var(--bg1), var(--bg2));
 }
 
-/* modo light (lo activa tu JS con .theme-light) */
-.theme-light{
+/* ✅ LIGHT MODE (selector bien escrito y cerrado) */
+html.theme-light,
+body.theme-light{
   --bg1: #f3f6ff;
   --bg2: #eef2ff;
 
@@ -37,17 +46,26 @@
   --muted: rgba(0,0,0,.55);
 
   --shadow: 0 18px 60px rgba(0,0,0,.12);
+
+  --modalBg: rgba(255,255,255,.94);
+  --modalBorder: rgba(0,0,0,.10);
+  --modalTxt: rgba(0,0,0,.86);
+  --closeInvert: 0;
+
+  --backdropA: rgba(13,110,253,.12);
+  --backdropB: rgba(0,0,0,.45);
 }
 
 .muted{ color: var(--muted) !important; }
 .tiny{ font-size: .84rem; }
 
 .cardx{
-  background: rgba(255,255,255,.06);
+  background: var(--glass2);
   border: 1px solid var(--stroke);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .glass{
@@ -55,8 +73,94 @@
   border: 1px solid var(--stroke);
   border-radius: var(--radius);
   backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   box-shadow: var(--shadow);
 }
+
+/* ✅ TOP: le damos contraste real (ahí se te “perdía”) */
+.topfb-inner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 12px;
+  gap:14px;
+
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg2) 70%, transparent); /* ✅ más sólido */
+  border: 1px solid var(--stroke);
+  box-shadow: var(--shadow);
+
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* search input legible */
+.topfb-search{
+  background: color-mix(in srgb, var(--glass) 75%, transparent);
+  border: 1px solid var(--stroke);
+}
+.topfb-search input{
+  color: var(--txt);
+}
+.topfb-search input::placeholder{
+  color: color-mix(in srgb, var(--muted) 80%, transparent);
+}
+
+/* tabs con contraste */
+.topfb-tab{
+  color: var(--muted);
+  transition: background .18s ease, color .18s ease, border-color .18s ease, transform .08s ease;
+}
+.topfb-tab:hover{
+  background: color-mix(in srgb, var(--glass) 90%, transparent);
+  color: var(--txt);
+  transform: translateY(-1px);
+}
+.topfb-tab.active{
+  background: color-mix(in srgb, var(--glass2) 95%, transparent);
+  border-color: var(--stroke);
+  color: var(--txt);
+}
+
+/* icon buttons */
+.topfb-iconbtn{
+  background: color-mix(in srgb, var(--glass) 85%, transparent);
+  border: 1px solid var(--stroke);
+  color: var(--txt);
+}
+.topfb-iconbtn:hover{
+  background: color-mix(in srgb, var(--glass2) 95%, transparent);
+}
+
+/* inputs generales (si usas .form-glass) */
+.form-glass{
+  background: color-mix(in srgb, var(--glass) 80%, transparent) !important;
+  border: 1px solid var(--stroke) !important;
+  color: var(--txt) !important;
+}
+.form-glass::placeholder{ color: var(--muted); }
+
+/* ✅ modal */
+.modal-dark{
+  background: var(--modalBg) !important;
+  border: 1px solid var(--modalBorder) !important;
+  border-radius: 18px !important;
+  color: var(--modalTxt) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.modal-dark .btn-close{
+  filter: invert(var(--closeInvert));
+  opacity: .65;
+}
+.modal-dark .btn-close:hover{ opacity: 1; }
+
+/* ✅ backdrop */
+.modal-backdrop.show{
+  background: radial-gradient(circle at top, var(--backdropA), var(--backdropB));
+  opacity: 1;
+}
+
 
 .cardpad{ padding: 16px 16px; }
 .innerpad{ padding: 14px; border-radius: 18px; }
@@ -70,7 +174,7 @@
   padding: 18px 18px 46px;
 }
 
-/* ===== TOP FB ===== */
+/* ===== TOP===== */
 .topfb{
   position: sticky;
   top: 10px;
@@ -181,7 +285,6 @@
 
 .topfb-iconbtn:hover{ background: rgba(255,255,255,.10); }
 
-/* ===== 3 COLUMN LAYOUT (FB vibes) ===== */
 .layout3{
   display: grid;
   grid-template-columns: 320px minmax(560px, 680px) 360px;
@@ -192,13 +295,11 @@
   margin: 18px auto 0;
 }
 
-/* sticky left / right */
 .stickycol{
   position: sticky;
-  top: 86px; /* debajo del topbar */
+  top: 86px;
 }
 
-/* ===== LEFT ===== */
 .left-profile{
   display: flex;
   align-items: center;
@@ -385,13 +486,26 @@
 
 .form-glass::placeholder{ color: var(--muted); }
 
-/* modal */
+/* ✅ modal (theme-aware con variables) */
 .modal-dark{
-  background: rgba(20,22,30,.92);
-  border: 1px solid var(--stroke);
-  border-radius: 18px;
-  color: var(--txt);
+  background: var(--modalBg) !important;
+  border: 1px solid var(--modalBorder) !important;
+  border-radius: 18px !important;
+  color: var(--modalTxt) !important;
   backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.modal-dark .btn-close{
+  filter: invert(var(--closeInvert));
+  opacity: .65;
+}
+.modal-dark .btn-close:hover{ opacity: 1; }
+
+/* ✅ backdrop (theme-aware) */
+.modal-backdrop.show{
+  background: radial-gradient(circle at top, var(--backdropA), var(--backdropB));
+  opacity: 1;
 }
 
 /* responsive */
@@ -413,7 +527,6 @@
   padding: 22px 18px;
 }
 
-/* 3 columnas tipo FB: izquierda / feed / derecha */
 .layout3--fb{
   width: 100%;
   max-width: 1400px;
@@ -424,7 +537,6 @@
   align-items: start;
 }
 
-/* En pantallas enormes que respire más */
 @media (min-width: 1600px){
   .layout3--fb{
     max-width: 1550px;
@@ -433,14 +545,9 @@
   }
 }
 
-/* Evitar que el centro se “aplane” */
-.centercol{
-  min-width: 0;
-}
+.centercol{ min-width: 0; }
 
-.topfb-center{
-  gap: 10px;
-}
+.topfb-center{ gap: 10px; }
 .topfb-tab{
   width: 48px;
   height: 48px;

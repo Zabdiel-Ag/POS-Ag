@@ -1,12 +1,15 @@
+/* =========================
+   DASHBOARD.JS (FIXED)
+   ========================= */
 
 const USERS_KEY = "pos_users";
 const SESSION_KEY = "pos_session";
 const BUSINESSES_KEY = "pos_businesses";
 const POSTS_KEY = "pos_posts";
 
-// =======================
-// Helpers base
-// =======================
+/* -------------------------
+   Storage utils
+-------------------------- */
 function safeJSON(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -17,22 +20,17 @@ function safeJSON(key, fallback) {
   }
 }
 
-function getUsers() {
-  return safeJSON(USERS_KEY, []);
-}
-function getSession() {
-  return safeJSON(SESSION_KEY, null);
-}
-function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
-}
-function getBusinesses() {
-  return safeJSON(BUSINESSES_KEY, []);
-}
+function getUsers() { return safeJSON(USERS_KEY, []); }
+function getSession() { return safeJSON(SESSION_KEY, null); }
+function clearSession() { localStorage.removeItem(SESSION_KEY); }
+function getBusinesses() { return safeJSON(BUSINESSES_KEY, []); }
 function getBusinessByOwner(userId) {
   return getBusinesses().find(b => b.ownerUserId === userId) || null;
 }
 
+/* -------------------------
+   Auth
+-------------------------- */
 function requireAuthOrRedirect() {
   const session = getSession();
   if (!session?.userId) {
@@ -56,6 +54,9 @@ function requireAuthOrRedirect() {
   return { user, biz };
 }
 
+/* -------------------------
+   UI helpers
+-------------------------- */
 function initialsFromName(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
   const a = parts[0]?.[0] || "B";
@@ -63,7 +64,55 @@ function initialsFromName(name) {
   return (a + b).toUpperCase();
 }
 
+function fmtMoney(n) {
+  const x = Number(n || 0);
+  try {
+    return x.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+  } catch {
+    return "$" + x.toFixed(2);
+  }
+}
 
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+/* -------------------------
+   Date helpers (LOCAL)
+-------------------------- */
+function localDateKey(d = new Date()) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`; // LOCAL
+}
+
+/* -------------------------
+   Normalizers (bizId compat)
+-------------------------- */
+function normalizeBizId(x) {
+  if (!x || typeof x !== "object") return x;
+  if (!x.bizId && x.businessId) x.bizId = x.businessId;
+  if (!x.businessId && x.bizId) x.businessId = x.bizId;
+  return x;
+}
+
+/* -------------------------
+   Find arrays in localStorage
+   (THIS WAS MISSING IN YOUR FILE ✅)
+-------------------------- */
+function findArrayFromStorage(keys) {
+  for (const k of keys) {
+    const arr = safeJSON(k, null);
+    if (Array.isArray(arr)) return { key: k, arr };
+  }
+  return null;
+}
+
+/* -------------------------
+   Business render
+-------------------------- */
 function renderBusiness(biz) {
   const bizNameRight = document.getElementById("bizNameRight");
   const bizCategoryRight = document.getElementById("bizCategoryRight");
@@ -113,11 +162,10 @@ function renderBusiness(biz) {
   }
 }
 
-// =======================
-// TEAM (demo o real si existe)
-// =======================
+/* -------------------------
+   Team (connected)
+-------------------------- */
 function readTeamForBiz(bizId) {
-  // Intenta encontrar data real en varias llaves comunes
   const candidates = [
     "pos_team",
     "pos_employees",
@@ -130,8 +178,10 @@ function readTeamForBiz(bizId) {
     const arr = safeJSON(k, null);
     if (!Array.isArray(arr)) continue;
 
-    // Filtra por negocio si viene con businessId
-    const filtered = arr.filter(x => !x || typeof x !== "object" ? false : (x.businessId ? x.businessId === bizId : true));
+    const filtered = arr
+      .map(normalizeBizId)
+      .filter(x => x && typeof x === "object" ? (x.bizId ? x.bizId === bizId : true) : false);
+
     if (filtered.length) return filtered;
   }
   return null;
@@ -171,24 +221,21 @@ function renderTeam(ctx) {
   `).join("");
 }
 
-// =======================
-// NAV (topbar icons)
-// =======================
+/* -------------------------
+   Nav
+-------------------------- */
 function setupNav() {
   const buttons = document.querySelectorAll(".nav-item");
   buttons.forEach(btn => {
     btn.addEventListener("click", () => {
       buttons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
-
       const screen = btn.getAttribute("data-screen");
       if (screen === "pos") window.location.href = "Pos.html";
-      // aquí puedes agregar inventory.html / reportes.html cuando existan
     });
   });
 }
 
-// Bottom nav (si existe)
 function setupBottomNav() {
   const items = document.querySelectorAll(".bottom-nav .bn-item");
   if (!items.length) return;
@@ -201,13 +248,9 @@ function setupBottomNav() {
   });
 }
 
-// =======================
-// LOGOUT (modal + fallback)
-// Respeta IDs existentes:
-// btnLogoutDash, btnLogoutDashMobile (si existe)
-// logoutModal, confirmLogout (tu modal actual)
-// También soporta legacy: logoutModalDash / confirmLogoutDash
-// =======================
+/* -------------------------
+   Logout
+-------------------------- */
 function setupLogout() {
   const btn1 = document.getElementById("btnLogoutDash");
   const btn2 = document.getElementById("btnLogoutDashMobile");
@@ -229,7 +272,6 @@ function setupLogout() {
     if (confirm("¿Seguro que deseas cerrar sesión?")) doLogout();
   };
 
-  // Si no hay modal o bootstrap, fallback
   if (!modalEl || !window.bootstrap?.Modal) {
     btn1?.addEventListener("click", fallback);
     btn2?.addEventListener("click", fallback);
@@ -239,21 +281,18 @@ function setupLogout() {
   const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
   btn1?.addEventListener("click", () => modal.show());
   btn2?.addEventListener("click", () => modal.show());
-
   confirmBtn?.addEventListener("click", doLogout);
 }
 
-// =======================
-// THEME (modo oscuro / claro)
-// IDs: btnTheme + mirror btnThemeMirror
-// =======================
+/* -------------------------
+   Theme
+-------------------------- */
 function setupTheme() {
   const btn = document.getElementById("btnTheme");
   if (!btn) return;
 
   const KEY = "dash_theme";
   const saved = localStorage.getItem(KEY);
-
   if (saved === "light") document.body.classList.add("theme-light");
 
   const paintIcon = () => {
@@ -271,159 +310,13 @@ function setupTheme() {
     paintIcon();
   });
 
-  // mirror (lado izquierdo)
   const mirror = document.getElementById("btnThemeMirror");
   if (mirror) mirror.addEventListener("click", () => btn.click());
 }
 
-// =======================
-// KPIs (Resumen) — NO cambia tus IDs
-// IDs esperados:
-// kpiIngresos, kpiTickets, kpiInventario, kpiAlertas
-// sumVentasHoy, sumProductos, sumStockBajo, sumConectados
-// =======================
-function fmtMoney(n) {
-  const x = Number(n || 0);
-  try {
-    return x.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
-  } catch {
-    return "$" + x.toFixed(2);
-  }
-}
-
-function setText(id, value) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = value;
-}
-
-// Busca arrays en localStorage por múltiples keys
-function findArrayFromStorage(keys) {
-  for (const k of keys) {
-    const v = safeJSON(k, null);
-    if (Array.isArray(v)) return { key: k, arr: v };
-  }
-  return null;
-}
-
-function normalizeDateOnly(d) {
-  const dd = new Date(d);
-  if (isNaN(dd.getTime())) return null;
-  return dd.toISOString().slice(0, 10); // YYYY-MM-DD
-}
-
-function renderKpis(ctx) {
-  // Candidatos de ventas
-  const salesHit = findArrayFromStorage([
-    "pos_sales",
-    "pos_orders",
-    "pos_transactions",
-    "pos_receipts",
-    "pos_tickets"
-  ]);
-
-  // Candidatos de productos/inventario
-  const prodHit = findArrayFromStorage([
-    "pos_products",
-    "pos_inventory",
-    "pos_stock",
-    "pos_items"
-  ]);
-
-  // Candidatos de alertas (opcional)
-  const alertHit = findArrayFromStorage([
-    "pos_alerts",
-    "pos_notifications",
-    "pos_warnings"
-  ]);
-
-  // Team conectado
-  const team = readTeamForBiz(ctx.biz.id);
-  const connectedCount = Array.isArray(team) ? team.length : 0;
-
-  // ===== SALES KPIs =====
-  let ingresosHoy = 0;
-  let ticketsHoy = 0;
-
-  if (salesHit?.arr?.length) {
-    const today = new Date().toISOString().slice(0, 10);
-
-    const mine = salesHit.arr.filter(x => {
-      if (!x || typeof x !== "object") return false;
-      if (x.businessId && x.businessId !== ctx.biz.id) return false;
-      return true;
-    });
-
-    const todaySales = mine.filter(x => {
-      const dateKey = x.date || x.createdAt || x.timestamp || x.time || x.fecha;
-      const d = normalizeDateOnly(dateKey);
-      return d === today;
-    });
-
-    // ingresos: total/amount
-    ingresosHoy = todaySales.reduce((acc, x) => {
-      const amount =
-        x.total ?? x.amount ?? x.importe ?? x.totalAmount ?? x.paymentTotal ?? 0;
-      return acc + Number(amount || 0);
-    }, 0);
-
-    // tickets: count o items
-    ticketsHoy = todaySales.length;
-  }
-
-  // ===== INVENTORY KPIs =====
-  let totalProductos = 0;
-  let stockBajo = 0;
-
-  if (prodHit?.arr?.length) {
-    const mine = prodHit.arr.filter(x => {
-      if (!x || typeof x !== "object") return false;
-      if (x.businessId && x.businessId !== ctx.biz.id) return false;
-      return true;
-    });
-
-    totalProductos = mine.length;
-
-    stockBajo = mine.reduce((acc, x) => {
-      const qty = Number(x.stock ?? x.qty ?? x.quantity ?? x.existencias ?? 0);
-      const min = Number(x.minStock ?? x.min ?? x.lowStock ?? x.stockMin ?? 0);
-      if (min > 0 && qty <= min) return acc + 1;
-      // fallback heurística: qty <= 3
-      if (min === 0 && qty > 0 && qty <= 3) return acc + 1;
-      return acc;
-    }, 0);
-  }
-
-  // ===== ALERTAS =====
-  let alertasPendientes = 0;
-
-  // si hay alertas guardadas, usa esas; si no, calcula por stock bajo
-  if (alertHit?.arr?.length) {
-    const mine = alertHit.arr.filter(x => {
-      if (!x || typeof x !== "object") return false;
-      if (x.businessId && x.businessId !== ctx.biz.id) return false;
-      const status = (x.status || x.state || x.estado || "").toString().toLowerCase();
-      return status ? status !== "done" && status !== "closed" && status !== "resuelto" : true;
-    });
-    alertasPendientes = mine.length;
-  } else {
-    alertasPendientes = stockBajo;
-  }
-
-  // ===== Pintar en tus IDs =====
-  // Top KPIs (tarjetitas)
-  setText("kpiIngresos", ingresosHoy ? fmtMoney(ingresosHoy) : "—");
-  setText("kpiTickets", ticketsHoy ? String(ticketsHoy) : "—");
-  setText("kpiInventario", totalProductos ? String(totalProductos) : "—");
-  setText("kpiAlertas", alertasPendientes ? String(alertasPendientes) : "—");
-
-  // Desglose (lista inferior)
-  setText("sumVentasHoy", ingresosHoy ? fmtMoney(ingresosHoy) : "—");
-  setText("sumProductos", totalProductos ? String(totalProductos) : "—");
-  setText("sumStockBajo", stockBajo ? String(stockBajo) : "—");
-  setText("sumConectados", connectedCount ? String(connectedCount) : "—");
-}
-
-// Botón “Ver desglose” (si existe)
+/* -------------------------
+   Breakdown
+-------------------------- */
 function setupBreakdownToggle() {
   const btn = document.getElementById("btnBreakdown");
   const box = document.getElementById("breakdownBox");
@@ -434,15 +327,104 @@ function setupBreakdownToggle() {
   });
 }
 
-// =======================
-// POSTS (Marketing Feed)
-// =======================
-function getPosts() {
-  return safeJSON(POSTS_KEY, []);
+/* -------------------------
+   KPIs (FIXED ✅)
+-------------------------- */
+function renderKpis(ctx) {
+  // ✅ usa tus keys reales v1 + fallback
+  const salesHit = findArrayFromStorage([
+    "pos_sales_v1",
+    "pos_sales",
+    "pos_orders",
+    "pos_transactions",
+    "pos_receipts",
+    "pos_tickets"
+  ]);
+
+  const prodHit = findArrayFromStorage([
+    "pos_products_v1",
+    "pos_products",
+    "pos_inventory",
+    "pos_stock",
+    "pos_items"
+  ]);
+
+  const alertHit = findArrayFromStorage([
+    "pos_alerts",
+    "pos_notifications",
+    "pos_warnings"
+  ]);
+
+  const team = readTeamForBiz(ctx.biz.id);
+  const connectedCount = Array.isArray(team) ? team.length : 0;
+
+  // ===== SALES =====
+  let todayTotal = 0;
+  let ticketsHoy = 0;
+
+  if (salesHit?.arr?.length) {
+    const today = localDateKey();
+
+    const mine = salesHit.arr
+      .map(normalizeBizId)
+      .filter(x => x?.bizId === ctx.biz.id);
+
+    const todaySales = mine.filter(x => {
+      const dt = x.createdAt || x.date || x.timestamp || x.time || x.fecha;
+      const dd = new Date(dt);
+      if (isNaN(dd.getTime())) return false;
+      return localDateKey(dd) === today;
+    });
+
+    todayTotal = todaySales.reduce((acc, x) => acc + Number(x.total || 0), 0);
+    ticketsHoy = todaySales.length;
+  }
+
+  // ===== INVENTORY =====
+  let totalProductos = 0;
+  let stockBajo = 0;
+
+  if (prodHit?.arr?.length) {
+    const mine = prodHit.arr
+      .map(normalizeBizId)
+      .filter(x => x?.bizId === ctx.biz.id);
+
+    totalProductos = mine.length;
+
+    stockBajo = mine.reduce((acc, x) => {
+      const qty = Number(x.stock ?? x.qty ?? x.quantity ?? 0);
+      const min = Number(x.minStock ?? x.min ?? 0);
+      if (min > 0 && qty <= min) return acc + 1;
+      if (min === 0 && qty > 0 && qty <= 3) return acc + 1;
+      return acc;
+    }, 0);
+  }
+
+  // ===== ALERTS =====
+  let alertasPendientes = 0;
+  if (alertHit?.arr?.length) {
+    alertasPendientes = alertHit.arr.length;
+  } else {
+    // fallback: stock bajo = alertas
+    alertasPendientes = stockBajo;
+  }
+
+  // ===== Paint =====
+  setText("todayTotalChip", todayTotal ? `${fmtMoney(todayTotal)} hoy` : "—");
+  setText("kpiTickets", ticketsHoy ? String(ticketsHoy) : "—");
+  setText("kpiInventario", totalProductos ? String(totalProductos) : "—");
+  setText("kpiAlertas", alertasPendientes ? String(alertasPendientes) : "—");
+
+  setText("sumProductos", totalProductos ? String(totalProductos) : "—");
+  setText("sumStockBajo", stockBajo ? String(stockBajo) : "—");
+  setText("sumConectados", connectedCount ? String(connectedCount) : "—");
 }
-function savePosts(posts) {
-  localStorage.setItem(POSTS_KEY, JSON.stringify(posts));
-}
+
+/* =======================
+   POSTS (Marketing Feed)
+======================= */
+function getPosts() { return safeJSON(POSTS_KEY, []); }
+function savePosts(posts) { localStorage.setItem(POSTS_KEY, JSON.stringify(posts)); }
 
 function showErr(el, msg) {
   if (!el) return;
@@ -487,13 +469,9 @@ function renderFeed(ctx) {
     .filter(p => p.businessId === ctx.biz.id)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  const existingPlaceholder = feed.querySelector('[data-placeholder="true"]');
-
   if (posts.length === 0) {
-    // si ya tienes placeholder fijo, lo dejamos
-    if (!existingPlaceholder) {
-      // opcional: podrías poner uno aquí si quieres
-    }
+    // no rompas placeholder si lo usas en HTML
+    // (si quieres, aquí puedes pintar un mensaje “sin posts”)
     return;
   }
 
@@ -591,7 +569,6 @@ function setupCreatePost() {
 
   btnOpen.addEventListener("click", openModal);
 
-  // Mirror del composer (si existe)
   const openComposer = document.getElementById("btnOpenPostMirror");
   if (openComposer) openComposer.addEventListener("click", () => btnOpen.click());
 
@@ -654,23 +631,19 @@ function setupCreatePost() {
   });
 }
 
-// =======================
-// EDIT BIZ (si existe botón)
-// =======================
 function setupEditBiz() {
   document.getElementById("btnEditBiz")?.addEventListener("click", () => {
     window.location.href = "Index.html";
   });
 }
 
-// =======================
-// INIT (NO tocar) 😈
-// =======================
+/* -------------------------
+   INIT
+-------------------------- */
 (function init() {
   const data = requireAuthOrRedirect();
   if (!data) return;
 
-  // CLAVE para publicar posts
   window.__CTX__ = data;
 
   renderBusiness(data.biz);
@@ -690,12 +663,22 @@ function setupEditBiz() {
   setupCreatePost();
 })();
 
-//  Recalcula KPIs cuando regreses al tab o cambie storage
+// Recalcula KPIs al volver al tab y cuando cambie storage
 window.addEventListener("focus", () => {
   const ctx = window.__CTX__;
   if (ctx) renderKpis(ctx);
 });
-window.addEventListener("storage", () => {
+window.addEventListener("storage", (e) => {
   const ctx = window.__CTX__;
-  if (ctx) renderKpis(ctx);
+  if (!ctx) return;
+
+  // Solo recalcula si cambian llaves relevantes (más eficiente)
+  const keys = new Set([
+    "pos_sales_v1", "pos_sales", "pos_orders", "pos_transactions", "pos_receipts", "pos_tickets",
+    "pos_products_v1", "pos_products", "pos_inventory", "pos_stock", "pos_items",
+    "pos_alerts", "pos_notifications", "pos_warnings",
+    "pos_connected_users", "pos_team", "pos_employees", "pos_staff", "pos_users_business"
+  ]);
+
+  if (!e || !e.key || keys.has(e.key)) renderKpis(ctx);
 });
